@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SECURITIX — Three-Tier Biometric Security</title>
+  <meta name="description" content="Advanced three-tier biometric security system with iris, voice, and gesture authentication.">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+
+<!-- Background layers -->
+<canvas id="bg-canvas"></canvas>
+<div class="bg-gradient"></div>
+<div class="grid-overlay"></div>
+<div class="scanline"></div>
+
+<div class="app-container">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">
+        <h1>SECURITIX</h1>
+        <p>Three-Tier Biometric System</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <span class="status-dot"></span>
+      SYSTEM ONLINE
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="nav-bar">
+    <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+      <span class="nav-icon">📊</span> Dashboard
+    </button>
+    <button class="nav-btn" data-page="enroll" onclick="showPage('enroll')">
+      <span class="nav-icon">📝</span> Enroll
+    </button>
+    <button class="nav-btn" data-page="authenticate" onclick="showPage('authenticate')">
+      <span class="nav-icon">🔐</span> Authenticate
+    </button>
+    <button class="nav-btn" data-page="manage" onclick="showPage('manage')">
+      <span class="nav-icon">⚙️</span> Manage
+    </button>
+  </nav>
+
+  <!-- ═══════ DASHBOARD PAGE ═══════ -->
+  <div id="page-dashboard" class="page active">
+    <h2 class="page-title">📊 System Dashboard</h2>
+    <p class="page-subtitle">> security_status: active | monitoring...</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" id="stat-users">0</div>
+        <div class="stat-label">Enrolled Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔒</div>
+        <div class="stat-value">3</div>
+        <div class="stat-label">Security Tiers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">AES</div>
+        <div class="stat-label">Encryption</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🟢</div>
+        <div class="stat-value">ON</div>
+        <div class="stat-label">System Status</div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <h3 style="font-family:'Orbitron',sans-serif; font-size:1rem; margin-bottom:16px; color:var(--accent-cyan);">
+        SECURITY TIERS OVERVIEW
+      </h3>
+      <div class="tiers-showcase">
+        <div class="tier-card">
+          <div class="tier-number">TIER 01</div>
+          <div class="tier-icon">👁️</div>
+          <div class="tier-name">Iris Detection</div>
+          <div class="tier-desc">MediaPipe Face Mesh iris geometry analysis with cosine similarity matching</div>
+        </div>
+        <div class="tier-card">
+          <div class="tier-number">TIER 02</div>
+          <div class="tier-icon">🎤</div>
+          <div class="tier-name">Voice Detection</div>
+          <div class="tier-desc">MFCC feature extraction with Dynamic Time Warping voice comparison</div>
+        </div>
+        <div class="tier-card">
+          <div class="tier-number">TIER 03</div>
+          <div class="tier-icon">🤚</div>
+          <div class="tier-name">Hand Gesture</div>
+          <div class="tier-desc">MediaPipe Hands landmark analysis with normalized gesture matching</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ ENROLL PAGE ═══════ -->
+  <div id="page-enroll" class="page">
+    <h2 class="page-title">📝 User Enrollment</h2>
+    <p class="page-subtitle">> register biometric data across all security tiers</p>
+
+    <div class="glass-card" id="enroll-form">
+      <div class="input-group">
+        <label for="enroll-username">Username</label>
+        <input type="text" id="enroll-username" class="input-field" placeholder="Enter username to enroll..." autocomplete="off">
+      </div>
+      <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px; line-height:1.6;">
+        ⚡ The system will capture your <strong style="color:var(--accent-cyan)">iris</strong>,
+        <strong style="color:var(--accent-purple)">voice</strong>, and
+        <strong style="color:var(--accent-green)">hand gesture</strong> data.
+        OpenCV windows will open for webcam capture. Follow the on-screen instructions.
+      </p>
+      <button class="btn btn-primary" onclick="startEnrollment()">
+        🚀 Start Enrollment
+      </button>
+    </div>
+
+    <div id="enroll-operation" class="operation-panel">
+      <div class="glass-card">
+        <h3 style="font-family:'Orbitron',sans-serif; font-size:1rem; margin-bottom:6px;">ENROLLMENT IN PROGRESS</h3>
+        <p id="enroll-message" style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px; font-family:'Share Tech Mono',monospace;"></p>
+        <div class="tier-progress">
+          <div id="enroll-tier1" class="tier-row waiting">
+            <div class="tier-row-icon">👁️</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 1 — Iris Scan</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+          <div id="enroll-tier2" class="tier-row waiting">
+            <div class="tier-row-icon">🎤</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 2 — Voice Recording</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+          <div id="enroll-tier3" class="tier-row waiting">
+            <div class="tier-row-icon">🤚</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 3 — Gesture Capture</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="enroll-result" class="result-banner">
+        <div class="result-icon"></div>
+        <div class="result-title"></div>
+        <div class="result-subtitle"></div>
+        <button class="btn btn-primary" style="margin-top: 24px;" onclick="resetEnrollForm()">↩ Enroll Another</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ AUTHENTICATE PAGE ═══════ -->
+  <div id="page-authenticate" class="page">
+    <h2 class="page-title">🔐 Authentication</h2>
+    <p class="page-subtitle">> automatic identity verification — no username required</p>
+
+    <div class="glass-card" id="auth-start">
+      <div style="text-align:center; padding: 20px 0;">
+        <div style="font-size:4rem; margin-bottom:16px;">🔐</div>
+        <h3 style="font-family:'Orbitron',sans-serif; font-size:1.2rem; margin-bottom:12px;">BIOMETRIC VERIFICATION</h3>
+        <p style="color:var(--text-secondary); max-width:500px; margin:0 auto 24px; line-height:1.7; font-size:0.9rem;">
+          The system will automatically scan your <strong style="color:var(--accent-cyan)">iris</strong>,
+          <strong style="color:var(--accent-purple)">voice</strong>, and
+          <strong style="color:var(--accent-green)">gesture</strong>
+          to identify you from the enrolled database. No username needed.
+        </p>
+        <button class="btn btn-auth" onclick="startAuthentication()">
+          ⚡ Begin Authentication
+        </button>
+      </div>
+    </div>
+
+    <div id="auth-operation" class="operation-panel">
+      <div class="glass-card">
+        <h3 style="font-family:'Orbitron',sans-serif; font-size:1rem; margin-bottom:6px;">AUTHENTICATION IN PROGRESS</h3>
+        <p id="auth-message" style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px; font-family:'Share Tech Mono',monospace;"></p>
+        <div class="tier-progress">
+          <div id="auth-tier1" class="tier-row waiting">
+            <div class="tier-row-icon">👁️</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 1 — Iris Verification</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+          <div id="auth-tier2" class="tier-row waiting">
+            <div class="tier-row-icon">🎤</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 2 — Voice Verification</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+          <div id="auth-tier3" class="tier-row waiting">
+            <div class="tier-row-icon">🤚</div>
+            <div class="tier-row-info">
+              <div class="tier-row-label">Tier 3 — Gesture Verification</div>
+              <div class="tier-row-detail">Waiting...</div>
+            </div>
+            <span class="tier-row-status">Waiting</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="auth-result" class="result-banner">
+        <div class="result-icon"></div>
+        <div class="result-title"></div>
+        <div class="result-subtitle"></div>
+        <button class="btn btn-primary" style="margin-top:24px;" onclick="resetAuthPanel()">↩ Try Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ MANAGE PAGE ═══════ -->
+  <div id="page-manage" class="page">
+    <h2 class="page-title">⚙️ Manage Users</h2>
+    <p class="page-subtitle">> view and manage enrolled biometric profiles</p>
+
+    <div class="glass-card">
+      <div id="user-list" class="user-list">
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
+          <p>Loading users...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "username": "mayur",
+  "enrolled": true,
+  "tiers": {
+    "iris": true,
+    "voice": true,
+    "gesture": true
+  }
+}
