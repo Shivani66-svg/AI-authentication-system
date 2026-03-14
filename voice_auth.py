@@ -67,10 +67,15 @@ def record_audio(duration=RECORD_DURATION, sample_rate=SAMPLE_RATE):
 
         # Check audio level
         max_amp = np.max(np.abs(audio))
-        print(f"  [VOICE] Recording done. (max amplitude: {max_amp:.4f})")
+        rms_energy = np.sqrt(np.mean(audio ** 2))
+        print(f"  [VOICE] Recording done. (max amplitude: {max_amp:.4f}, RMS: {rms_energy:.4f})")
 
-        if max_amp < 0.005:
+        if max_amp < 0.02:
             print("  [VOICE WARNING] Very low audio — almost silent! Check microphone.")
+            return None
+
+        if rms_energy < 0.005:
+            print("  [VOICE WARNING] Audio energy too low — no speech detected.")
             return None
 
         return audio
@@ -99,9 +104,10 @@ def extract_mfcc_features(audio, sample_rate=SAMPLE_RATE):
         # Trim silence from the beginning and end
         audio_trimmed, _ = librosa.effects.trim(audio, top_db=25)
 
-        # If trimmed audio is too short (less than 0.5 sec), use original
+        # If trimmed audio is too short, no actual speech was detected
         if len(audio_trimmed) < sample_rate * 0.5:
-            audio_trimmed = audio
+            print("  [VOICE] No speech detected — audio is mostly silence/noise.")
+            return None
 
         # Extract MFCCs
         mfccs = librosa.feature.mfcc(y=audio_trimmed, sr=sample_rate, n_mfcc=N_MFCC)
