@@ -197,7 +197,7 @@ def draw_gesture_ui(frame, hand_landmarks, fw, fh, mode, progress, status_text,
 
     if match_score is not None:
         score_text = f"Match: {match_score:.2%}"
-        score_color = GREEN if match_score > 0.80 else RED
+        score_color = GREEN if match_score > 0.85 else RED
         cv2.putText(frame, score_text, (fw - 200, 30), cv2.FONT_HERSHEY_SIMPLEX,
                     0.6, score_color, 2, cv2.LINE_AA)
 
@@ -207,7 +207,7 @@ def draw_gesture_ui(frame, hand_landmarks, fw, fh, mode, progress, status_text,
                 (15, fh - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1, cv2.LINE_AA)
 
 
-def enroll_gesture(frame_callback=None):
+def enroll_gesture(frame_callback=None, cap=None):
     """
     Capture hand gesture features for enrollment.
     The user holds a gesture and features are averaged over multiple frames.
@@ -224,13 +224,14 @@ def enroll_gesture(frame_callback=None):
     print("  [GESTURE] Keep your hand STEADY during capture.")
     print("  [GESTURE] Press 'Q' to cancel.\n")
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("  [GESTURE ERROR] Cannot open webcam!")
-        return None
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    own_cap = cap is None
+    if own_cap:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("  [GESTURE ERROR] Cannot open webcam!")
+            return None
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     hands = mp_hands.Hands(
         max_num_hands=1,
@@ -275,13 +276,13 @@ def enroll_gesture(frame_callback=None):
                 stable_gesture = current_pattern
                 stability_count = 1
 
-            # Only capture when gesture is stable (held for at least 5 frames)
-            if stability_count >= 5:
+            # Only capture when gesture is stable (held for at least 8 frames)
+            if stability_count >= 8:
                 features = extract_gesture_features(hand_landmarks)
                 collected_features.append(features)
                 status = f"Capturing '{gesture_name}'... ({len(collected_features)}/{target_samples})"
             else:
-                status = f"Hold steady... (stabilizing {stability_count}/5)"
+                status = f"Hold steady... (stabilizing {stability_count}/8)"
 
             draw_gesture_ui(frame, hand_landmarks, fw, fh, 'enroll',
                           progress, status, finger_states, gesture_name)
@@ -301,12 +302,14 @@ def enroll_gesture(frame_callback=None):
             cv2.imshow("Security System - Gesture Enrollment", frame)
             if cv2.waitKey(1) & 0xFF in [ord('q'), ord('Q')]:
                 print("  [GESTURE] Enrollment cancelled.")
-                cap.release()
+                if own_cap:
+                    cap.release()
                 cv2.destroyAllWindows()
                 hands.close()
                 return None
 
-    cap.release()
+    if own_cap:
+        cap.release()
     if not frame_callback:
         cv2.destroyAllWindows()
     hands.close()
@@ -324,7 +327,7 @@ def enroll_gesture(frame_callback=None):
     return avg_features
 
 
-def capture_gesture(frame_callback=None):
+def capture_gesture(frame_callback=None, cap=None):
     """
     Capture live hand gesture features WITHOUT comparing to any stored template.
     Used during authentication to scan against all enrolled users.
@@ -339,13 +342,14 @@ def capture_gesture(frame_callback=None):
     print("  [GESTURE] Show your hand gesture to the camera.")
     print("  [GESTURE] Press 'Q' to cancel.\n")
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("  [GESTURE ERROR] Cannot open webcam!")
-        return None
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    own_cap = cap is None
+    if own_cap:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("  [GESTURE ERROR] Cannot open webcam!")
+            return None
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     hands = mp_hands.Hands(
         max_num_hands=1,
@@ -402,12 +406,14 @@ def capture_gesture(frame_callback=None):
             cv2.imshow("Security System - Gesture Scan", frame)
             if cv2.waitKey(1) & 0xFF in [ord('q'), ord('Q')]:
                 print("  [GESTURE] Scan cancelled.")
-                cap.release()
+                if own_cap:
+                    cap.release()
                 cv2.destroyAllWindows()
                 hands.close()
                 return None
 
-    cap.release()
+    if own_cap:
+        cap.release()
     if not frame_callback:
         cv2.destroyAllWindows()
     hands.close()
@@ -421,7 +427,7 @@ def capture_gesture(frame_callback=None):
     return avg_features
 
 
-def verify_gesture(stored_features, threshold=0.80):
+def verify_gesture(stored_features, threshold=0.85):
     """
     Verify hand gesture against stored template.
 

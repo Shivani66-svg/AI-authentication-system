@@ -235,13 +235,13 @@ def authenticate_user():
     # Find best iris match
     best_iris_user = max(iris_scores, key=iris_scores.get)
     best_iris_score = iris_scores[best_iris_user]
-    iris_passed = best_iris_score >= 0.75
+    iris_passed = best_iris_score >= 0.82
 
     if iris_passed:
         print(f"\n  [TIER 1 PASSED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
     else:
         print(f"\n  [TIER 1 FAILED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
-        print("  [SECURITY] No iris match found above threshold (75%).")
+        print("  [SECURITY] No iris match found above threshold (82%).")
 
     time.sleep(1)
 
@@ -274,13 +274,13 @@ def authenticate_user():
     # Find best voice match (lowest distance)
     best_voice_user = min(voice_scores, key=voice_scores.get)
     best_voice_distance = voice_scores[best_voice_user]
-    voice_passed = best_voice_distance <= 80.0
+    voice_passed = best_voice_distance <= 55.0
 
     if voice_passed:
         print(f"\n  [TIER 2 PASSED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
     else:
         print(f"\n  [TIER 2 FAILED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
-        print("  [SECURITY] No voice match found below threshold (80.0).")
+        print("  [SECURITY] No voice match found below threshold (55.0).")
 
     time.sleep(1)
 
@@ -313,13 +313,13 @@ def authenticate_user():
     # Find best gesture match
     best_gesture_user = max(gesture_scores, key=gesture_scores.get)
     best_gesture_score = gesture_scores[best_gesture_user]
-    gesture_passed = best_gesture_score >= 0.80
+    gesture_passed = best_gesture_score >= 0.85
 
     if gesture_passed:
         print(f"\n  [TIER 3 PASSED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
     else:
         print(f"\n  [TIER 3 FAILED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
-        print("  [SECURITY] No gesture match found above threshold (80%).")
+        print("  [SECURITY] No gesture match found above threshold (85%).")
 
     time.sleep(1)
 

@@ -195,7 +195,7 @@ def draw_ui(frame, landmarks, fw, fh, mode, progress, status_text, match_score=N
 
     if match_score is not None:
         score_text = f"Match Score: {match_score:.2%}"
-        score_color = GREEN if match_score > 0.75 else RED
+        score_color = GREEN if match_score > 0.82 else RED
         cv2.putText(frame, score_text, (fw - 250, 30), cv2.FONT_HERSHEY_SIMPLEX,
                     0.6, score_color, 2, cv2.LINE_AA)
 
@@ -205,7 +205,7 @@ def draw_ui(frame, landmarks, fw, fh, mode, progress, status_text, match_score=N
                 (15, fh - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1, cv2.LINE_AA)
 
 
-def enroll_iris(frame_callback=None):
+def enroll_iris(frame_callback=None, cap=None):
     """
     Capture iris features for enrollment.
     Collects features over multiple frames and averages them for a stable template.
@@ -222,13 +222,14 @@ def enroll_iris(frame_callback=None):
     print("  [IRIS] Keep your eyes open and hold still.")
     print("  [IRIS] Press 'Q' to cancel.\n")
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("  [IRIS ERROR] Cannot open webcam!")
-        return None
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    own_cap = cap is None
+    if own_cap:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("  [IRIS ERROR] Cannot open webcam!")
+            return None
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     face_mesh = mp_face_mesh.FaceMesh(
         max_num_faces=1,
@@ -238,7 +239,7 @@ def enroll_iris(frame_callback=None):
     )
 
     collected_features = []
-    target_samples = 30  # Number of frames to average
+    target_samples = 50  # Number of frames to average (more = more stable template)
     start_time = time.time()
     timeout = 30  # seconds
 
@@ -282,12 +283,14 @@ def enroll_iris(frame_callback=None):
             cv2.imshow("Security System - Iris Enrollment", frame)
             if cv2.waitKey(1) & 0xFF in [ord('q'), ord('Q')]:
                 print("  [IRIS] Enrollment cancelled.")
-                cap.release()
+                if own_cap:
+                    cap.release()
                 cv2.destroyAllWindows()
                 face_mesh.close()
                 return None
 
-    cap.release()
+    if own_cap:
+        cap.release()
     if not frame_callback:
         cv2.destroyAllWindows()
     face_mesh.close()
@@ -302,7 +305,7 @@ def enroll_iris(frame_callback=None):
     return avg_features
 
 
-def capture_iris(frame_callback=None):
+def capture_iris(frame_callback=None, cap=None):
     """
     Capture live iris features WITHOUT comparing to any stored template.
     Used during authentication to scan against all enrolled users.
@@ -317,13 +320,14 @@ def capture_iris(frame_callback=None):
     print("  [IRIS] Please look straight at the camera.")
     print("  [IRIS] Press 'Q' to cancel.\n")
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("  [IRIS ERROR] Cannot open webcam!")
-        return None
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    own_cap = cap is None
+    if own_cap:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("  [IRIS ERROR] Cannot open webcam!")
+            return None
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     face_mesh = mp_face_mesh.FaceMesh(
         max_num_faces=1,
@@ -375,12 +379,14 @@ def capture_iris(frame_callback=None):
             cv2.imshow("Security System - Iris Scan", frame)
             if cv2.waitKey(1) & 0xFF in [ord('q'), ord('Q')]:
                 print("  [IRIS] Scan cancelled.")
-                cap.release()
+                if own_cap:
+                    cap.release()
                 cv2.destroyAllWindows()
                 face_mesh.close()
                 return None
 
-    cap.release()
+    if own_cap:
+        cap.release()
     if not frame_callback:
         cv2.destroyAllWindows()
     face_mesh.close()
@@ -394,7 +400,7 @@ def capture_iris(frame_callback=None):
     return avg_features
 
 
-def verify_iris(stored_features, threshold=0.75):
+def verify_iris(stored_features, threshold=0.82):
     """
     Verify iris against stored template.
 

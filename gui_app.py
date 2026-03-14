@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import user_exists, save_user_data, load_user_data, get_all_users, delete_user
 from utils import cosine_similarity, dtw_distance
-from voice_assistant import say
+from voice_assistant import say, say_wait
 
 # ══════════════════════════════════════════════════════
 #  COLOR THEME
@@ -411,47 +411,79 @@ class SecurityApp(tk.Tk):
         threading.Thread(target=self._run_enroll, args=(name,), daemon=True).start()
 
     def _run_enroll(self, name):
+        cam = None
         try:
+            # Pre-open camera once for instant startup across all tiers
+            cam = cv2.VideoCapture(0)
+            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            # Warm up: read frames to let auto-exposure settle
+            for _ in range(10):
+                cam.read()
+
             # Tier 1: Iris
             self.after(0, lambda: self._set_tier(self.et, "t1", "running", "Look at the camera..."))
             self.after(0, lambda: self.enroll_msg.configure(text="Scanning iris — look at camera..."))
+            say_wait("Iris enrollment. Look at the camera.")
             from iris_auth import enroll_iris
-            iris = enroll_iris(frame_callback=self._update_cam)
+            iris = enroll_iris(frame_callback=self._update_cam, cap=cam)
             if iris is None:
                 say("Enrollment failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._enroll_done(False, "Iris enrollment failed."))
                 return
             self.after(0, lambda: self._set_tier(self.et, "t1", "passed", "Iris captured!"))
 
-            # Tier 2: Voice (no camera)
+            time.sleep(3)  # 3-second pause between tiers
+
+            # Tier 2: Voice
             self.after(0, lambda: self._set_tier(self.et, "t2", "running", "Recording voice..."))
             self.after(0, lambda: self.enroll_msg.configure(text="Recording voice — speak your passphrase..."))
-            # Show mic animation on camera
             self._show_mic_graphic()
+            say_wait("Voice enrollment. Speak your phrase.")
             from voice_auth import enroll_voice
             voice = enroll_voice()
             if voice is None:
                 say("Enrollment failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._enroll_done(False, "Voice enrollment failed."))
                 return
             self.after(0, lambda: self._set_tier(self.et, "t2", "passed", "Voice captured!"))
 
+            time.sleep(3)  # 3-second pause between tiers
+
+            # Flush stale frames before gesture capture
+            for _ in range(5):
+                cam.read()
+
             # Tier 3: Gesture
             self.after(0, lambda: self._set_tier(self.et, "t3", "running", "Show your gesture..."))
             self.after(0, lambda: self.enroll_msg.configure(text="Scanning gesture — show hand to camera..."))
+            say_wait("Gesture enrollment. Show your hand gesture.")
             from gesture_auth import enroll_gesture
-            gesture = enroll_gesture(frame_callback=self._update_cam)
+            gesture = enroll_gesture(frame_callback=self._update_cam, cap=cam)
             if gesture is None:
                 say("Enrollment failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._enroll_done(False, "Gesture enrollment failed."))
                 return
             self.after(0, lambda: self._set_tier(self.et, "t3", "passed", "Gesture captured!"))
 
+            cam.release()
+            cam = None
             save_user_data(name, iris, voice, gesture)
             say("Enrollment completed.")
             self.after(0, lambda: self._enroll_done(True, f"User '{name}' enrolled successfully!"))
 
         except Exception as e:
+            if cam is not None:
+                try:
+                    cam.release()
+                except Exception:
+                    pass
             say("Enrollment failed.")
             self.after(0, lambda: self._enroll_done(False, str(e)))
 
@@ -573,16 +605,27 @@ class SecurityApp(tk.Tk):
         threading.Thread(target=self._run_auth, daemon=True).start()
 
     def _run_auth(self):
+        cam = None
         try:
             users = get_all_users()
+
+            # Pre-open camera once for instant startup across all tiers
+            cam = cv2.VideoCapture(0)
+            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            for _ in range(10):
+                cam.read()
 
             # Tier 1: Iris
             self.after(0, lambda: self._set_tier(self.at, "t1", "running", "Scanning iris..."))
             self.after(0, lambda: self.auth_msg.configure(text="Scanning iris — look at camera..."))
+            say_wait("Iris authentication. Look at the camera.")
             from iris_auth import capture_iris
-            live_iris = capture_iris(frame_callback=self._update_cam)
+            live_iris = capture_iris(frame_callback=self._update_cam, cap=cam)
             if live_iris is None:
                 say("Authentication failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._auth_done(False, "Iris scan failed."))
                 return
 
@@ -592,18 +635,23 @@ class SecurityApp(tk.Tk):
                 if d: iris_scores[u] = cosine_similarity(d[0], live_iris)
             best_iris = max(iris_scores, key=iris_scores.get)
             iris_sc = iris_scores[best_iris]
-            iris_ok = iris_sc >= 0.75
+            iris_ok = iris_sc >= 0.82
             s = "passed" if iris_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t1", s, f"Best: {best_iris} ({iris_sc:.0%})"))
+
+            time.sleep(3)  # 3-second pause between tiers
 
             # Tier 2: Voice
             self.after(0, lambda: self._set_tier(self.at, "t2", "running", "Recording voice..."))
             self.after(0, lambda: self.auth_msg.configure(text="Recording voice — speak your passphrase..."))
             self._show_mic_graphic()
+            say_wait("Voice authentication. Speak your passphrase.")
             from voice_auth import capture_voice
             live_voice = capture_voice()
             if live_voice is None:
                 say("Authentication failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._auth_done(False, "Voice scan failed."))
                 return
 
@@ -613,17 +661,26 @@ class SecurityApp(tk.Tk):
                 if d: voice_scores[u] = dtw_distance(live_voice.T, d[1].T)
             best_voice = min(voice_scores, key=voice_scores.get)
             voice_d = voice_scores[best_voice]
-            voice_ok = voice_d <= 80.0
+            voice_ok = voice_d <= 55.0
             s = "passed" if voice_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t2", s, f"Best: {best_voice} (dist: {voice_d:.1f})"))
+
+            time.sleep(3)  # 3-second pause between tiers
+
+            # Flush stale frames before gesture capture
+            for _ in range(5):
+                cam.read()
 
             # Tier 3: Gesture
             self.after(0, lambda: self._set_tier(self.at, "t3", "running", "Scanning gesture..."))
             self.after(0, lambda: self.auth_msg.configure(text="Scanning gesture — show your hand..."))
+            say_wait("Gesture authentication. Show your hand gesture.")
             from gesture_auth import capture_gesture
-            live_gesture = capture_gesture(frame_callback=self._update_cam)
+            live_gesture = capture_gesture(frame_callback=self._update_cam, cap=cam)
             if live_gesture is None:
                 say("Authentication failed.")
+                cam.release()
+                cam = None
                 self.after(0, lambda: self._auth_done(False, "Gesture scan failed."))
                 return
 
@@ -633,9 +690,12 @@ class SecurityApp(tk.Tk):
                 if d: gest_scores[u] = cosine_similarity(d[2], live_gesture)
             best_gest = max(gest_scores, key=gest_scores.get)
             gest_sc = gest_scores[best_gest]
-            gest_ok = gest_sc >= 0.80
+            gest_ok = gest_sc >= 0.85
             s = "passed" if gest_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t3", s, f"Best: {best_gest} ({gest_sc:.0%})"))
+
+            cam.release()
+            cam = None
 
             # Decision
             all_ok = iris_ok and voice_ok and gest_ok
@@ -651,6 +711,11 @@ class SecurityApp(tk.Tk):
                 self.after(0, lambda: self._auth_done(False, "Biometric verification failed."))
 
         except Exception as e:
+            if cam is not None:
+                try:
+                    cam.release()
+                except Exception:
+                    pass
             say("Authentication failed.")
             self.after(0, lambda: self._auth_done(False, str(e)))
 

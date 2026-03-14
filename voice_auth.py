@@ -128,7 +128,7 @@ def extract_mfcc_features(audio, sample_rate=SAMPLE_RATE):
 def enroll_voice():
     """
     Capture voice features for enrollment.
-    Records one clear passphrase sample.
+    Records TWO passphrase samples and averages them for a more robust template.
 
     Returns:
         numpy array of MFCC features, or None if cancelled.
@@ -139,22 +139,42 @@ def enroll_voice():
         return None
 
     print("\n  [VOICE] Starting voice enrollment...")
-    print("  [VOICE] Speak a clear passphrase when recording begins.")
-    print("  [VOICE] Recording starts in 2 seconds...\n")
-    time.sleep(2)
+    print("  [VOICE] You will record your passphrase 2 times for accuracy.")
+    print("  [VOICE] Speak the SAME passphrase each time.\n")
 
-    audio = record_audio()
-    if audio is None:
-        print("  [VOICE] Recording failed!")
-        return None
+    samples = []
+    for attempt in range(1, 3):
+        print(f"  [VOICE] ── Sample {attempt}/2 ──")
+        print("  [VOICE] Speak your passphrase clearly when recording begins.")
+        print("  [VOICE] Recording starts in 2 seconds...\n")
+        time.sleep(2)
 
-    features = extract_mfcc_features(audio)
-    if features is None:
-        print("  [VOICE] Feature extraction failed!")
-        return None
+        audio = record_audio()
+        if audio is None:
+            print(f"  [VOICE] Recording {attempt} failed!")
+            return None
 
-    print(f"  [VOICE] Enrollment complete! Feature shape: {features.shape}")
-    return features
+        features = extract_mfcc_features(audio)
+        if features is None:
+            print(f"  [VOICE] Feature extraction failed for sample {attempt}!")
+            return None
+
+        samples.append(features)
+        print(f"  [VOICE] Sample {attempt} captured! Shape: {features.shape}")
+
+        if attempt < 2:
+            print("  [VOICE] Get ready for the next recording...\n")
+            time.sleep(1)
+
+    # Average the two samples for a more stable voice template
+    # Truncate both to the shorter length to align time frames
+    min_frames = min(s.shape[1] for s in samples)
+    truncated = [s[:, :min_frames] for s in samples]
+    avg_features = np.mean(truncated, axis=0)
+
+    print(f"\n  [VOICE] Enrollment complete! Averaged 2 samples.")
+    print(f"  [VOICE] Template shape: {avg_features.shape}")
+    return avg_features
 
 
 def capture_voice():
@@ -184,7 +204,7 @@ def capture_voice():
     return features
 
 
-def verify_voice(stored_features, threshold=80.0):
+def verify_voice(stored_features, threshold=55.0):
     """
     Verify voice against stored template using DTW distance.
 

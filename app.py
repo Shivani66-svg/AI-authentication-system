@@ -180,7 +180,7 @@ def run_authentication():
 
         best_iris_user = max(iris_scores, key=iris_scores.get)
         best_iris_score = iris_scores[best_iris_user]
-        iris_passed = best_iris_score >= 0.75
+        iris_passed = best_iris_score >= 0.82
 
         with status_lock:
             status = "passed" if iris_passed else "failed"
@@ -218,7 +218,7 @@ def run_authentication():
 
         best_voice_user = min(voice_scores, key=voice_scores.get)
         best_voice_distance = voice_scores[best_voice_user]
-        voice_passed = best_voice_distance <= 80.0
+        voice_passed = best_voice_distance <= 55.0
 
         with status_lock:
             status = "passed" if voice_passed else "failed"
@@ -256,7 +256,7 @@ def run_authentication():
 
         best_gesture_user = max(gesture_scores, key=gesture_scores.get)
         best_gesture_score = gesture_scores[best_gesture_user]
-        gesture_passed = best_gesture_score >= 0.80
+        gesture_passed = best_gesture_score >= 0.85
 
         with status_lock:
             status = "passed" if gesture_passed else "failed"

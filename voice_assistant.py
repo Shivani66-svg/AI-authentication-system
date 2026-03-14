@@ -46,5 +46,10 @@ assistant = VoiceAssistant()
 
 
 def say(text):
-    """Convenience function to speak text."""
+    """Convenience function to speak text (non-blocking)."""
     assistant.speak(text)
+
+
+def say_wait(text):
+    """Speak text and WAIT until speech is completely finished (blocking)."""
+    assistant._speak_sync(text)
