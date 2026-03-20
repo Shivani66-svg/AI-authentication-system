@@ -21,20 +21,52 @@
 import sys
 import os
 import time
+import subprocess
 
 # Ensure the project directory is in PATH
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import user_exists, save_user_data, load_user_data, get_all_users, delete_user
+from database import validate_username
 from iris_auth import enroll_iris, verify_iris, capture_iris
 from voice_auth import enroll_voice, verify_voice, capture_voice
 from gesture_auth import enroll_gesture, verify_gesture, capture_gesture
 from utils import print_banner, print_status, print_tier_header, cosine_similarity, dtw_distance
+from config import (
+    MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_SECONDS,
+    IRIS_THRESHOLD, VOICE_THRESHOLD, GESTURE_THRESHOLD
+)
+from security_logger import (
+    log_enrollment, log_authentication, log_auth_attempt,
+    log_lockout, log_user_deleted, log_error
+)
+
+# ── Brute-Force Protection ──────────────────────────────────────────────────
+failed_auth_timestamps = []
+
+
+def is_locked_out():
+    """Check if too many failed auth attempts have occurred."""
+    now = time.time()
+    # Clean old entries
+    failed_auth_timestamps[:] = [t for t in failed_auth_timestamps if now - t < 300]
+    if len(failed_auth_timestamps) >= MAX_FAILED_ATTEMPTS:
+        if failed_auth_timestamps and (now - failed_auth_timestamps[-1]) < LOCKOUT_DURATION_SECONDS:
+            return True
+    return False
+
+
+def record_failure():
+    """Record a failed authentication."""
+    failed_auth_timestamps.append(time.time())
 
 
 def clear_screen():
-    """Clear the console screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    """Clear the console screen safely (no shell injection)."""
+    if os.name == 'nt':
+        subprocess.run(['cmd', '/c', 'cls'], shell=False)
+    else:
+        subprocess.run(['clear'], shell=False)
 
 
 def show_main_menu():
@@ -124,6 +156,14 @@ def enroll_user():
         input("\n  Press ENTER to continue...")
         return
 
+    # Validate username (security: prevent path traversal)
+    safe_name = validate_username(username)
+    if safe_name is None:
+        print("  [ERROR] Invalid username. Use only letters, numbers, and underscores (2-32 chars).")
+        input("\n  Press ENTER to continue...")
+        return
+    username = safe_name
+
     if user_exists(username):
         print(f"  [WARNING] User '{username}' already exists!")
         overwrite = input("  Overwrite existing data? (y/n): ").strip().lower()
@@ -175,6 +215,7 @@ def enroll_user():
 
     # ── Save all data ────────────────────────────────────────────────
     save_user_data(username, iris_features, voice_features, gesture_features)
+    log_enrollment(username, True)
 
     print_banner(f"ENROLLMENT COMPLETE FOR '{username.upper()}'", char="*")
     print("\n  All three biometric tiers enrolled successfully!")
@@ -191,6 +232,17 @@ def authenticate_user():
     clear_screen()
     print_banner("USER AUTHENTICATION")
     print()
+
+    # Brute-force lockout check
+    if is_locked_out():
+        remaining = int(LOCKOUT_DURATION_SECONDS - (time.time() - failed_auth_timestamps[-1]))
+        print(f"  [SECURITY] System locked due to too many failed attempts.")
+        print(f"  [SECURITY] Try again in {max(remaining, 1)} seconds.")
+        log_lockout("console", "Authentication blocked by lockout")
+        input("\n  Press ENTER to continue...")
+        return
+
+    log_auth_attempt("Console authentication started")
     print("  The system will automatically identify you.")
     print("  No username required — just present your biometrics.\n")
 
@@ -235,13 +287,13 @@ def authenticate_user():
     # Find best iris match
     best_iris_user = max(iris_scores, key=iris_scores.get)
     best_iris_score = iris_scores[best_iris_user]
-    iris_passed = best_iris_score >= 0.82
+    iris_passed = best_iris_score >= IRIS_THRESHOLD
 
     if iris_passed:
         print(f"\n  [TIER 1 PASSED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
     else:
         print(f"\n  [TIER 1 FAILED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
-        print("  [SECURITY] No iris match found above threshold (82%).")
+        print(f"  [SECURITY] No iris match found above threshold ({IRIS_THRESHOLD:.0%}).")
 
     time.sleep(1)
 
@@ -274,13 +326,13 @@ def authenticate_user():
     # Find best voice match (lowest distance)
     best_voice_user = min(voice_scores, key=voice_scores.get)
     best_voice_distance = voice_scores[best_voice_user]
-    voice_passed = best_voice_distance <= 55.0
+    voice_passed = best_voice_distance <= VOICE_THRESHOLD
 
     if voice_passed:
         print(f"\n  [TIER 2 PASSED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
     else:
         print(f"\n  [TIER 2 FAILED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
-        print("  [SECURITY] No voice match found below threshold (55.0).")
+        print(f"  [SECURITY] No voice match found below threshold ({VOICE_THRESHOLD}).")
 
     time.sleep(1)
 
@@ -313,13 +365,13 @@ def authenticate_user():
     # Find best gesture match
     best_gesture_user = max(gesture_scores, key=gesture_scores.get)
     best_gesture_score = gesture_scores[best_gesture_user]
-    gesture_passed = best_gesture_score >= 0.85
+    gesture_passed = best_gesture_score >= GESTURE_THRESHOLD
 
     if gesture_passed:
         print(f"\n  [TIER 3 PASSED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
     else:
         print(f"\n  [TIER 3 FAILED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
-        print("  [SECURITY] No gesture match found above threshold (85%).")
+        print(f"  [SECURITY] No gesture match found above threshold ({GESTURE_THRESHOLD:.0%}).")
 
     time.sleep(1)
 
@@ -349,6 +401,18 @@ def authenticate_user():
         "Tier 2 (Voice)": (voice_passed, f"Best: '{best_voice_user}' — Distance: {best_voice_distance:.2f}"),
         "Tier 3 (Gesture)": (gesture_passed, f"Best: '{best_gesture_user}' — Score: {best_gesture_score:.2%}"),
     }
+
+    # Log the authentication result
+    auth_scores = {
+        "iris": f"{best_iris_score:.2%}",
+        "voice_dist": f"{best_voice_distance:.2f}",
+        "gesture": f"{best_gesture_score:.2%}",
+    }
+    if all_passed:
+        log_authentication(identified_user, True, auth_scores)
+    else:
+        record_failure()
+        log_authentication(identified_user, False, auth_scores)
 
     show_result_screen(all_passed, identified_user, scores)
     input("  Press ENTER to continue...")
@@ -381,15 +445,23 @@ def delete_user_flow():
     if not username:
         return
 
-    if not user_exists(username):
-        print(f"\n  [ERROR] User '{username}' not found.")
+    # Validate username
+    safe_name = validate_username(username)
+    if safe_name is None:
+        print("\n  [ERROR] Invalid username.")
         input("\n  Press ENTER to continue...")
         return
 
-    confirm = input(f"  Are you sure you want to delete '{username}'? (y/n): ").strip().lower()
+    if not user_exists(safe_name):
+        print(f"\n  [ERROR] User '{safe_name}' not found.")
+        input("\n  Press ENTER to continue...")
+        return
+
+    confirm = input(f"  Are you sure you want to delete '{safe_name}'? (y/n): ").strip().lower()
     if confirm == 'y':
-        delete_user(username)
-        print(f"  User '{username}' has been deleted.")
+        delete_user(safe_name)
+        log_user_deleted(safe_name, deleted_by="console")
+        print(f"  User '{safe_name}' has been deleted.")
     else:
         print("  Deletion cancelled.")
 

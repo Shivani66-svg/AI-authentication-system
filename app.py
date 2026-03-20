@@ -2,6 +2,15 @@
 =============================================================================
   FLASK WEB APPLICATION — Three-Tier Biometric Security System Frontend
   Serves the web UI and provides API endpoints for biometric operations.
+  
+  Security improvements:
+    - Secret key for session management
+    - Security headers (CSP, X-Frame-Options, etc.)
+    - Rate limiting on authentication endpoints
+    - Brute-force lockout (5 failed attempts → 60s cooldown)
+    - No internal exception details leaked to clients
+    - Operation timeout enforcement
+    - Security audit logging
 =============================================================================
 """
 
@@ -10,16 +19,114 @@ import os
 import json
 import threading
 import time
+from datetime import datetime
+from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, render_template, jsonify, request
 from database import user_exists, save_user_data, load_user_data, get_all_users, delete_user
+from database import validate_username
 from utils import cosine_similarity, dtw_distance
+from config import (
+    FLASK_SECRET_KEY, MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_SECONDS,
+    LOCKOUT_WINDOW_SECONDS, IRIS_THRESHOLD, VOICE_THRESHOLD, GESTURE_THRESHOLD,
+    OPERATION_TIMEOUT_SECONDS
+)
+from security_logger import (
+    log_enrollment, log_authentication, log_auth_attempt,
+    log_lockout, log_user_deleted, log_error, log_security_event
+)
 
 app = Flask(__name__)
+app.secret_key = FLASK_SECRET_KEY
 
-# Global state for async biometric operations
+# ── Security Headers ────────────────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to every response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+# ── Brute-Force Protection ──────────────────────────────────────────────────
+failed_attempts = []  # list of timestamps of failed auth attempts
+failed_lock = threading.Lock()
+
+
+def is_locked_out():
+    """Check if the system is in brute-force lockout."""
+    with failed_lock:
+        now = time.time()
+        # Clean old entries outside the window
+        failed_attempts[:] = [t for t in failed_attempts if now - t < LOCKOUT_WINDOW_SECONDS]
+        
+        if len(failed_attempts) >= MAX_FAILED_ATTEMPTS:
+            # Check if most recent failure is within lockout duration
+            if failed_attempts and (now - failed_attempts[-1]) < LOCKOUT_DURATION_SECONDS:
+                return True
+    return False
+
+
+def record_failed_attempt():
+    """Record a failed authentication attempt."""
+    with failed_lock:
+        failed_attempts.append(time.time())
+
+
+def get_lockout_remaining():
+    """Get remaining lockout seconds."""
+    with failed_lock:
+        if not failed_attempts:
+            return 0
+        elapsed = time.time() - failed_attempts[-1]
+        remaining = LOCKOUT_DURATION_SECONDS - elapsed
+        return max(0, int(remaining))
+
+
+# ── Rate Limiting ───────────────────────────────────────────────────────────
+request_timestamps = {}
+request_lock = threading.Lock()
+
+
+def rate_limit(max_requests=10, window_seconds=60):
+    """Simple rate limiter decorator."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            client_ip = request.remote_addr or "unknown"
+            now = time.time()
+            
+            with request_lock:
+                if client_ip not in request_timestamps:
+                    request_timestamps[client_ip] = []
+                
+                # Clean old timestamps
+                request_timestamps[client_ip] = [
+                    t for t in request_timestamps[client_ip]
+                    if now - t < window_seconds
+                ]
+                
+                if len(request_timestamps[client_ip]) >= max_requests:
+                    log_security_event("RATE_LIMIT", f"IP={client_ip} endpoint={request.path}")
+                    return jsonify({
+                        "success": False,
+                        "error": "Too many requests. Please try again later."
+                    }), 429
+                
+                request_timestamps[client_ip].append(now)
+            
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ── Global state for async biometric operations ────────────────────────────
 operation_status = {
     "active": False,
     "operation": None,       # "enroll" or "authenticate"
@@ -30,6 +137,7 @@ operation_status = {
     "result": None,          # Final result
     "username": None,
     "error": None,
+    "started_at": None,
 }
 
 status_lock = threading.Lock()
@@ -49,6 +157,7 @@ def reset_status():
             "result": None,
             "username": None,
             "error": None,
+            "started_at": None,
         }
 
 
@@ -60,6 +169,7 @@ def run_enrollment(username):
             operation_status["active"] = True
             operation_status["operation"] = "enroll"
             operation_status["username"] = username
+            operation_status["started_at"] = time.time()
 
         # ── TIER 1: Iris ──
         with status_lock:
@@ -76,6 +186,7 @@ def run_enrollment(username):
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Iris enrollment failed."
+            log_enrollment(username, False, "Iris capture failed")
             return
 
         with status_lock:
@@ -96,6 +207,7 @@ def run_enrollment(username):
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Voice enrollment failed."
+            log_enrollment(username, False, "Voice capture failed")
             return
 
         with status_lock:
@@ -116,6 +228,7 @@ def run_enrollment(username):
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Gesture enrollment failed."
+            log_enrollment(username, False, "Gesture capture failed")
             return
 
         with status_lock:
@@ -123,6 +236,7 @@ def run_enrollment(username):
 
         # ── Save ──
         save_user_data(username, iris_features, voice_features, gesture_features)
+        log_enrollment(username, True)
 
         with status_lock:
             operation_status["complete"] = True
@@ -130,10 +244,11 @@ def run_enrollment(username):
             operation_status["message"] = f"User '{username}' enrolled successfully!"
 
     except Exception as e:
+        log_error("enrollment", str(e))
         with status_lock:
             operation_status["complete"] = True
             operation_status["result"] = "failed"
-            operation_status["error"] = str(e)
+            operation_status["error"] = "An internal error occurred during enrollment."
 
 
 def run_authentication():
@@ -143,6 +258,9 @@ def run_authentication():
         with status_lock:
             operation_status["active"] = True
             operation_status["operation"] = "authenticate"
+            operation_status["started_at"] = time.time()
+
+        log_auth_attempt("Web API authentication started")
 
         users = get_all_users()
         if not users:
@@ -167,6 +285,8 @@ def run_authentication():
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Iris scan failed."
+            record_failed_attempt()
+            log_authentication("unknown", False, detail="Iris scan failed")
             return
 
         # Match against all users
@@ -178,9 +298,17 @@ def run_authentication():
                 score = cosine_similarity(stored_iris, live_iris)
                 iris_scores[user] = score
 
+        if not iris_scores:
+            with status_lock:
+                operation_status["complete"] = True
+                operation_status["result"] = "failed"
+                operation_status["error"] = "Could not process biometric data."
+            record_failed_attempt()
+            return
+
         best_iris_user = max(iris_scores, key=iris_scores.get)
         best_iris_score = iris_scores[best_iris_user]
-        iris_passed = best_iris_score >= 0.82
+        iris_passed = best_iris_score >= IRIS_THRESHOLD
 
         with status_lock:
             status = "passed" if iris_passed else "failed"
@@ -206,6 +334,8 @@ def run_authentication():
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Voice scan failed."
+            record_failed_attempt()
+            log_authentication("unknown", False, detail="Voice scan failed")
             return
 
         voice_scores = {}
@@ -218,7 +348,7 @@ def run_authentication():
 
         best_voice_user = min(voice_scores, key=voice_scores.get)
         best_voice_distance = voice_scores[best_voice_user]
-        voice_passed = best_voice_distance <= 55.0
+        voice_passed = best_voice_distance <= VOICE_THRESHOLD
 
         with status_lock:
             status = "passed" if voice_passed else "failed"
@@ -244,6 +374,8 @@ def run_authentication():
                 operation_status["complete"] = True
                 operation_status["result"] = "failed"
                 operation_status["error"] = "Gesture scan failed."
+            record_failed_attempt()
+            log_authentication("unknown", False, detail="Gesture scan failed")
             return
 
         gesture_scores = {}
@@ -256,7 +388,7 @@ def run_authentication():
 
         best_gesture_user = max(gesture_scores, key=gesture_scores.get)
         best_gesture_score = gesture_scores[best_gesture_user]
-        gesture_passed = best_gesture_score >= 0.85
+        gesture_passed = best_gesture_score >= GESTURE_THRESHOLD
 
         with status_lock:
             status = "passed" if gesture_passed else "failed"
@@ -277,6 +409,18 @@ def run_authentication():
         else:
             identified_user = best_iris_user
 
+        scores = {
+            "iris": f"{best_iris_score:.1%}",
+            "voice_dist": f"{best_voice_distance:.1f}",
+            "gesture": f"{best_gesture_score:.1%}",
+        }
+
+        if all_passed:
+            log_authentication(identified_user, True, scores)
+        else:
+            record_failed_attempt()
+            log_authentication(identified_user, False, scores)
+
         with status_lock:
             operation_status["complete"] = True
             operation_status["result"] = "granted" if all_passed else "denied"
@@ -287,10 +431,12 @@ def run_authentication():
             )
 
     except Exception as e:
+        log_error("authentication", str(e))
+        record_failed_attempt()
         with status_lock:
             operation_status["complete"] = True
             operation_status["result"] = "failed"
-            operation_status["error"] = str(e)
+            operation_status["error"] = "An internal error occurred during authentication."
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
@@ -301,40 +447,73 @@ def index():
 
 
 @app.route("/api/users")
+@rate_limit(max_requests=30, window_seconds=60)
 def api_list_users():
     users = get_all_users()
     return jsonify({"users": users, "count": len(users)})
 
 
 @app.route("/api/delete_user", methods=["POST"])
+@rate_limit(max_requests=10, window_seconds=60)
 def api_delete_user():
     data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "Invalid request."})
+    
     username = data.get("username", "").strip()
-    if not username:
-        return jsonify({"success": False, "error": "Username required."})
-    if not user_exists(username):
-        return jsonify({"success": False, "error": f"User '{username}' not found."})
-    delete_user(username)
-    return jsonify({"success": True, "message": f"User '{username}' deleted."})
+    
+    # Validate username
+    safe_name = validate_username(username)
+    if safe_name is None:
+        return jsonify({"success": False, "error": "Invalid username."})
+    
+    if not user_exists(safe_name):
+        # Unified error message to prevent user enumeration
+        return jsonify({"success": False, "error": "Operation failed."})
+    
+    delete_user(safe_name)
+    log_user_deleted(safe_name, deleted_by="web_api")
+    return jsonify({"success": True, "message": f"User '{safe_name}' deleted."})
 
 
 @app.route("/api/enroll", methods=["POST"])
+@rate_limit(max_requests=5, window_seconds=60)
 def api_enroll():
     data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "Invalid request."})
+    
     username = data.get("username", "").strip().lower()
-    if not username:
-        return jsonify({"success": False, "error": "Username is required."})
+    
+    # Validate username
+    safe_name = validate_username(username)
+    if safe_name is None:
+        return jsonify({"success": False, "error": "Invalid username. Use only letters, numbers, and underscores (2-32 chars)."})
+    
     if operation_status["active"]:
         return jsonify({"success": False, "error": "Another operation is already running."})
 
     reset_status()
-    thread = threading.Thread(target=run_enrollment, args=(username,), daemon=True)
+    thread = threading.Thread(target=run_enrollment, args=(safe_name,), daemon=True)
     thread.start()
+    log_security_event("ENROLL_START", f"Enrollment started for user '{safe_name}'")
     return jsonify({"success": True, "message": "Enrollment started."})
 
 
 @app.route("/api/authenticate", methods=["POST"])
+@rate_limit(max_requests=10, window_seconds=60)
 def api_authenticate():
+    # Check brute-force lockout
+    if is_locked_out():
+        remaining = get_lockout_remaining()
+        log_lockout("web_api", f"Authentication blocked, {remaining}s remaining")
+        return jsonify({
+            "success": False,
+            "error": f"Too many failed attempts. Try again in {remaining} seconds.",
+            "locked_out": True,
+            "lockout_remaining": remaining
+        })
+    
     if operation_status["active"]:
         return jsonify({"success": False, "error": "Another operation is already running."})
 
@@ -347,7 +526,29 @@ def api_authenticate():
 @app.route("/api/status")
 def api_status():
     with status_lock:
-        return jsonify(operation_status)
+        # Check for operation timeout
+        if operation_status["active"] and operation_status.get("started_at"):
+            elapsed = time.time() - operation_status["started_at"]
+            if elapsed > OPERATION_TIMEOUT_SECONDS:
+                operation_status["complete"] = True
+                operation_status["result"] = "failed"
+                operation_status["error"] = "Operation timed out."
+                operation_status["active"] = False
+                log_security_event("TIMEOUT", "Operation timed out")
+        
+        # Don't leak internal timing info — only send safe fields
+        safe_status = {
+            "active": operation_status["active"],
+            "operation": operation_status["operation"],
+            "current_tier": operation_status["current_tier"],
+            "tier_status": operation_status["tier_status"],
+            "message": operation_status["message"],
+            "complete": operation_status["complete"],
+            "result": operation_status["result"],
+            "username": operation_status["username"],
+            "error": operation_status["error"],
+        }
+        return jsonify(safe_status)
 
 
 @app.route("/api/reset", methods=["POST"])
@@ -360,5 +561,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("  THREE-TIER BIOMETRIC SECURITY SYSTEM")
     print("  Web Frontend — http://localhost:5000")
+    print("  🔒 Security hardening ACTIVE")
     print("=" * 60 + "\n")
     app.run(debug=False, port=5000, threaded=True)

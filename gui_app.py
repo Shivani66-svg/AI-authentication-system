@@ -19,8 +19,31 @@ from PIL import Image, ImageTk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import user_exists, save_user_data, load_user_data, get_all_users, delete_user
+from database import validate_username
 from utils import cosine_similarity, dtw_distance
 from voice_assistant import say, say_wait
+from config import (
+    MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_SECONDS,
+    IRIS_THRESHOLD, VOICE_THRESHOLD, GESTURE_THRESHOLD
+)
+from security_logger import (
+    log_enrollment, log_authentication, log_auth_attempt,
+    log_lockout, log_user_deleted, log_error
+)
+
+# ── Brute-Force Protection ──────────────────────────────────────────────────
+_failed_ts = []
+
+def _is_locked():
+    now = time.time()
+    _failed_ts[:] = [t for t in _failed_ts if now - t < 300]
+    if len(_failed_ts) >= MAX_FAILED_ATTEMPTS:
+        if _failed_ts and (now - _failed_ts[-1]) < LOCKOUT_DURATION_SECONDS:
+            return True
+    return False
+
+def _record_fail():
+    _failed_ts.append(time.time())
 
 # ══════════════════════════════════════════════════════
 #  COLOR THEME
@@ -393,6 +416,12 @@ class SecurityApp(tk.Tk):
         if not name:
             messagebox.showwarning("Required", "Please enter a username.")
             return
+        # Validate username (security: prevent path traversal)
+        safe_name = validate_username(name)
+        if safe_name is None:
+            messagebox.showerror("Invalid", "Invalid username. Use only letters, numbers, and underscores (2-32 chars).")
+            return
+        name = safe_name
         if user_exists(name):
             if not messagebox.askyesno("Exists", f"'{name}' exists. Overwrite?"):
                 return
@@ -475,6 +504,7 @@ class SecurityApp(tk.Tk):
             cam.release()
             cam = None
             save_user_data(name, iris, voice, gesture)
+            log_enrollment(name, True)
             say("Enrollment completed.")
             self.after(0, lambda: self._enroll_done(True, f"User '{name}' enrolled successfully!"))
 
@@ -591,6 +621,14 @@ class SecurityApp(tk.Tk):
         if not get_all_users():
             messagebox.showwarning("No Users", "No users enrolled! Enroll first.")
             return
+        # Brute-force lockout check
+        if _is_locked():
+            remaining = int(LOCKOUT_DURATION_SECONDS - (time.time() - _failed_ts[-1]))
+            messagebox.showerror("Locked Out",
+                f"Too many failed attempts.\nTry again in {max(remaining, 1)} seconds.")
+            log_lockout("gui", "Authentication blocked by lockout")
+            return
+        log_auth_attempt("GUI authentication started")
         self.auth_start.pack_forget()
         self.auth_res.pack_forget()
         self.auth_prog.pack(fill="x", pady=(8, 0))
@@ -635,7 +673,7 @@ class SecurityApp(tk.Tk):
                 if d: iris_scores[u] = cosine_similarity(d[0], live_iris)
             best_iris = max(iris_scores, key=iris_scores.get)
             iris_sc = iris_scores[best_iris]
-            iris_ok = iris_sc >= 0.82
+            iris_ok = iris_sc >= IRIS_THRESHOLD
             s = "passed" if iris_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t1", s, f"Best: {best_iris} ({iris_sc:.0%})"))
 
@@ -661,7 +699,7 @@ class SecurityApp(tk.Tk):
                 if d: voice_scores[u] = dtw_distance(live_voice.T, d[1].T)
             best_voice = min(voice_scores, key=voice_scores.get)
             voice_d = voice_scores[best_voice]
-            voice_ok = voice_d <= 55.0
+            voice_ok = voice_d <= VOICE_THRESHOLD
             s = "passed" if voice_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t2", s, f"Best: {best_voice} (dist: {voice_d:.1f})"))
 
@@ -690,7 +728,7 @@ class SecurityApp(tk.Tk):
                 if d: gest_scores[u] = cosine_similarity(d[2], live_gesture)
             best_gest = max(gest_scores, key=gest_scores.get)
             gest_sc = gest_scores[best_gest]
-            gest_ok = gest_sc >= 0.85
+            gest_ok = gest_sc >= GESTURE_THRESHOLD
             s = "passed" if gest_ok else "failed"
             self.after(0, lambda: self._set_tier(self.at, "t3", s, f"Best: {best_gest} ({gest_sc:.0%})"))
 
@@ -700,13 +738,26 @@ class SecurityApp(tk.Tk):
             # Decision
             all_ok = iris_ok and voice_ok and gest_ok
             same = (best_iris == best_voice == best_gest)
+
+            # Logging
+            auth_scores = {
+                "iris": f"{iris_sc:.2%}",
+                "voice_dist": f"{voice_d:.1f}",
+                "gesture": f"{gest_sc:.2%}",
+            }
+
             if all_ok and same:
+                log_authentication(best_iris, True, auth_scores)
                 say(f"Access granted to {best_iris}.")
                 self.after(0, lambda: self._auth_done(True, f"Identified as: {best_iris}"))
             elif all_ok:
+                _record_fail()
+                log_authentication("CONFLICT", False, auth_scores)
                 say("Authentication failed.")
                 self.after(0, lambda: self._auth_done(False, "Conflict — tiers matched different users."))
             else:
+                _record_fail()
+                log_authentication(best_iris, False, auth_scores)
                 say("Authentication failed.")
                 self.after(0, lambda: self._auth_done(False, "Biometric verification failed."))
 
@@ -778,6 +829,7 @@ class SecurityApp(tk.Tk):
     def _del_user(self, name):
         if messagebox.askyesno("Confirm", f"Delete '{name}'? Cannot be undone."):
             delete_user(name)
+            log_user_deleted(name, deleted_by="gui")
             self._refresh_users()
 
 

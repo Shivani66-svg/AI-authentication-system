@@ -13,6 +13,8 @@ import mediapipe as mp
 import math
 import time
 
+from security_logger import log_liveness_check
+
 # MediaPipe setup
 mp_face_mesh = mp.solutions.face_mesh
 
@@ -157,6 +159,65 @@ def extract_iris_features(landmarks, fw, fh):
     return np.array(features, dtype=np.float64)
 
 
+def compute_eye_aspect_ratio(landmarks, fw, fh):
+    """
+    Compute Eye Aspect Ratio (EAR) for liveness detection.
+    A real person blinks, causing EAR fluctuations over time.
+    A photo has constant EAR (near-zero variance).
+    """
+    # Left eye vertical distances
+    left_v1 = math.dist(
+        get_landmark_coords(landmarks, 159, fw, fh),  # top
+        get_landmark_coords(landmarks, 145, fw, fh)   # bottom
+    )
+    left_v2 = math.dist(
+        get_landmark_coords(landmarks, 158, fw, fh),
+        get_landmark_coords(landmarks, 153, fw, fh)
+    )
+    left_h = math.dist(
+        get_landmark_coords(landmarks, 33, fw, fh),
+        get_landmark_coords(landmarks, 133, fw, fh)
+    )
+    left_ear = (left_v1 + left_v2) / (2.0 * max(left_h, 1))
+
+    # Right eye vertical distances
+    right_v1 = math.dist(
+        get_landmark_coords(landmarks, 386, fw, fh),
+        get_landmark_coords(landmarks, 374, fw, fh)
+    )
+    right_v2 = math.dist(
+        get_landmark_coords(landmarks, 385, fw, fh),
+        get_landmark_coords(landmarks, 380, fw, fh)
+    )
+    right_h = math.dist(
+        get_landmark_coords(landmarks, 362, fw, fh),
+        get_landmark_coords(landmarks, 263, fw, fh)
+    )
+    right_ear = (right_v1 + right_v2) / (2.0 * max(right_h, 1))
+
+    return (left_ear + right_ear) / 2.0
+
+
+def check_liveness(ear_history, min_variance=0.001):
+    """
+    Check if the captured EAR values show enough variance to indicate
+    a real person (who blinks) vs a photo/video (constant EAR).
+    
+    Args:
+        ear_history: list of EAR values over time
+        min_variance: minimum variance threshold
+    
+    Returns:
+        bool: True if liveness check passed (real person detected)
+    """
+    if len(ear_history) < 10:
+        return False
+    variance = np.var(ear_history)
+    passed = variance >= min_variance
+    log_liveness_check(passed, f"EAR variance={variance:.6f} threshold={min_variance}")
+    return passed
+
+
 def draw_ui(frame, landmarks, fw, fh, mode, progress, status_text, match_score=None):
     """Draw the iris detection UI overlay."""
     # Draw eye contours
@@ -239,6 +300,7 @@ def enroll_iris(frame_callback=None, cap=None):
     )
 
     collected_features = []
+    ear_history = []  # For liveness detection
     target_samples = 50  # Number of frames to average (more = more stable template)
     start_time = time.time()
     timeout = 30  # seconds
@@ -264,6 +326,11 @@ def enroll_iris(frame_callback=None, cap=None):
             landmarks = results.multi_face_landmarks[0].landmark
             features = extract_iris_features(landmarks, fw, fh)
             collected_features.append(features)
+            
+            # Track EAR for liveness detection
+            ear = compute_eye_aspect_ratio(landmarks, fw, fh)
+            ear_history.append(ear)
+            
             draw_ui(frame, landmarks, fw, fh, 'enroll', progress, status)
         else:
             # No face panel
@@ -298,6 +365,13 @@ def enroll_iris(frame_callback=None, cap=None):
     if len(collected_features) < 10:
         print("  [IRIS] Not enough samples collected. Try again.")
         return None
+
+    # Liveness check: verify the person blinked (EAR variance)
+    if not check_liveness(ear_history):
+        print("  [IRIS] Liveness check FAILED — possible photo/video detected!")
+        print("  [IRIS] Please blink naturally during enrollment.")
+        return None
+    print("  [IRIS] Liveness check passed.")
 
     # Average the features for a stable template
     avg_features = np.mean(collected_features, axis=0)
@@ -337,6 +411,7 @@ def capture_iris(frame_callback=None, cap=None):
     )
 
     collected_features = []
+    ear_history = []  # For liveness detection
     target_samples = 20
     start_time = time.time()
     timeout = 20
@@ -362,6 +437,11 @@ def capture_iris(frame_callback=None, cap=None):
             landmarks = results.multi_face_landmarks[0].landmark
             features = extract_iris_features(landmarks, fw, fh)
             collected_features.append(features)
+            
+            # Track EAR for liveness detection
+            ear = compute_eye_aspect_ratio(landmarks, fw, fh)
+            ear_history.append(ear)
+            
             draw_ui(frame, landmarks, fw, fh, 'verify', progress, status)
         else:
             overlay = frame.copy()
@@ -394,6 +474,12 @@ def capture_iris(frame_callback=None, cap=None):
     if len(collected_features) < 5:
         print("  [IRIS] Not enough samples captured.")
         return None
+
+    # Liveness check during authentication too
+    if not check_liveness(ear_history):
+        print("  [IRIS] Liveness check FAILED — possible photo/video detected!")
+        return None
+    print("  [IRIS] Liveness check passed.")
 
     avg_features = np.mean(collected_features, axis=0)
     print(f"  [IRIS] Scan complete! ({len(collected_features)} frames captured)")
