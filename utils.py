@@ -10,12 +10,26 @@ from scipy.spatial.distance import cosine
 
 def cosine_similarity(vec1, vec2):
     """
-    Compute cosine similarity between two vectors.
+    Compute cosine similarity between two NORMALIZED vectors.
     Returns a value between 0 (no match) and 1 (perfect match).
+    Normalizes both vectors first for consistent comparison.
     """
-    if np.linalg.norm(vec1) == 0 or np.linalg.norm(vec2) == 0:
+    v1 = np.array(vec1, dtype=np.float64).flatten()
+    v2 = np.array(vec2, dtype=np.float64).flatten()
+
+    # Handle length mismatch — truncate to shorter
+    min_len = min(len(v1), len(v2))
+    if min_len == 0:
         return 0.0
-    return 1.0 - cosine(vec1, vec2)
+    v1 = v1[:min_len]
+    v2 = v2[:min_len]
+
+    n1 = np.linalg.norm(v1)
+    n2 = np.linalg.norm(v2)
+    if n1 == 0 or n2 == 0:
+        return 0.0
+
+    return float(1.0 - cosine(v1, v2))
 
 
 def euclidean_distance(vec1, vec2):
@@ -62,6 +76,58 @@ def dtw_distance(seq1, seq2):
     return dtw_matrix[n, m] / (n + m)  # Normalize by path length
 
 
+def find_best_match(scores, threshold, margin, higher_is_better=True):
+    """
+    Find the best matching user with discrimination margin enforcement.
+    
+    The best match must:
+      1. Pass the threshold
+      2. Beat the 2nd best by at least 'margin'
+    
+    This prevents picking the wrong user when two users have very similar scores.
+    
+    Args:
+        scores: dict of {username: score}
+        threshold: minimum score for 'higher_is_better=True', max for False
+        margin: minimum gap required between best and 2nd best
+        higher_is_better: True for similarity (higher=better), False for distance (lower=better)
+    
+    Returns:
+        tuple: (best_user, best_score, passed, is_discriminated)
+            - passed: True if threshold is met
+            - is_discriminated: True if margin check passed (best is clearly better than 2nd)
+    """
+    if not scores:
+        return None, 0.0, False, False
+
+    if higher_is_better:
+        sorted_users = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    else:
+        sorted_users = sorted(scores.items(), key=lambda x: x[1], reverse=False)
+
+    best_user, best_score = sorted_users[0]
+
+    # Check threshold
+    if higher_is_better:
+        passed = best_score >= threshold
+    else:
+        passed = best_score <= threshold
+
+    # Check discrimination margin (only matters with 2+ users)
+    if len(sorted_users) >= 2:
+        second_score = sorted_users[1][1]
+        if higher_is_better:
+            gap = best_score - second_score
+        else:
+            gap = second_score - best_score  # for distance, 2nd should be higher
+        is_discriminated = gap >= margin
+    else:
+        # Only 1 user enrolled — no margin needed
+        is_discriminated = True
+
+    return best_user, best_score, passed, is_discriminated
+
+
 def print_banner(text, char="=", width=60):
     """Print a formatted banner."""
     print(f"\n{char * width}")
@@ -72,7 +138,6 @@ def print_banner(text, char="=", width=60):
 def print_status(label, status, success=True):
     """Print a formatted status line."""
     icon = "✓" if success else "✗"
-    color_code = "" # Terminal colors not reliable on Windows
     print(f"  [{icon}] {label}: {status}")
 
 

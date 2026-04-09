@@ -24,21 +24,132 @@ from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
+import cv2
 from database import user_exists, save_user_data, load_user_data, get_all_users, delete_user
 from database import validate_username
-from utils import cosine_similarity, dtw_distance
+from utils import cosine_similarity, dtw_distance, find_best_match
 from config import (
     FLASK_SECRET_KEY, MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_SECONDS,
     LOCKOUT_WINDOW_SECONDS, IRIS_THRESHOLD, VOICE_THRESHOLD, GESTURE_THRESHOLD,
+    IRIS_MARGIN, VOICE_MARGIN, GESTURE_MARGIN,
     OPERATION_TIMEOUT_SECONDS
 )
+from voice_assistant import say
 from security_logger import (
-    log_enrollment, log_authentication, log_auth_attempt,
-    log_lockout, log_user_deleted, log_error, log_security_event
+    log_enrollment, log_authentication, log_auth_attempt, log_failed_tier,
+    log_lockout, log_user_deleted, log_security_event
 )
 
-app = Flask(__name__)
+def log_error(operation, error_msg):
+    """Helper to log errors since it's used in app but not in security_logger."""
+    log_security_event(f"ERROR_{operation.upper()}", error_msg)
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  WEB-COMPATIBLE BIOMETRIC FUNCTIONS
+#  These work with browser APIs instead of direct hardware access
+# ════════════════════════════════════════════════════════════════════════════════
+
+def enroll_iris_web():
+    """Web-compatible iris enrollment - simulates the process for demo."""
+    try:
+        # Simulate iris capture process (normally this would process browser camera stream)
+        time.sleep(2)  # Simulate capture time
+
+        # Generate mock iris features (in real implementation, this would come from browser)
+        import numpy as np
+        iris_features = np.random.rand(128).astype(np.float32)
+        iris_features = iris_features / np.linalg.norm(iris_features)  # Normalize
+
+        return iris_features
+    except Exception as e:
+        print(f"[IRIS ENROLL ERROR] {e}")
+        return None
+
+def enroll_voice_web():
+    """Web-compatible voice enrollment - simulates the process for demo."""
+    try:
+        # Simulate voice recording process (normally this would process browser microphone stream)
+        time.sleep(3)  # Simulate recording time
+
+        # Generate mock voice features (in real implementation, this would come from browser)
+        import numpy as np
+        # Simulate MFCC features
+        voice_features = np.random.rand(100, 13).astype(np.float32)
+
+        return voice_features
+    except Exception as e:
+        print(f"[VOICE ENROLL ERROR] {e}")
+        return None
+
+def enroll_gesture_web():
+    """Web-compatible gesture enrollment - simulates the process for demo."""
+    try:
+        # Simulate gesture capture process (normally this would process browser camera stream)
+        time.sleep(2.5)  # Simulate capture time
+
+        # Generate mock gesture features (in real implementation, this would come from browser)
+        import numpy as np
+        gesture_features = np.random.rand(63).astype(np.float32)  # 21 landmarks * 3 coordinates
+        gesture_features = gesture_features / np.linalg.norm(gesture_features)  # Normalize
+
+        return gesture_features
+    except Exception as e:
+        print(f"[GESTURE ENROLL ERROR] {e}")
+        return None
+
+def capture_iris_web():
+    """Web-compatible iris capture - simulates the process for demo."""
+    try:
+        # Simulate iris capture process
+        time.sleep(1.5)  # Simulate capture time
+
+        # Generate mock iris features
+        import numpy as np
+        iris_features = np.random.rand(128).astype(np.float32)
+        iris_features = iris_features / np.linalg.norm(iris_features)  # Normalize
+
+        return iris_features
+    except Exception as e:
+        print(f"[IRIS CAPTURE ERROR] {e}")
+        return None
+
+def capture_voice_web():
+    """Web-compatible voice capture - simulates the process for demo."""
+    try:
+        # Simulate voice recording process
+        time.sleep(2.5)  # Simulate recording time
+
+        # Generate mock voice features
+        import numpy as np
+        voice_features = np.random.rand(80, 13).astype(np.float32)
+
+        return voice_features
+    except Exception as e:
+        print(f"[VOICE CAPTURE ERROR] {e}")
+        return None
+
+def capture_gesture_web():
+    """Web-compatible gesture capture - simulates the process for demo."""
+    try:
+        # Simulate gesture capture process
+        time.sleep(2)  # Simulate capture time
+
+        # Generate mock gesture features
+        import numpy as np
+        gesture_features = np.random.rand(63).astype(np.float32)  # 21 landmarks * 3 coordinates
+        gesture_features = gesture_features / np.linalg.norm(gesture_features)  # Normalize
+
+        return gesture_features
+    except Exception as e:
+        print(f"[GESTURE CAPTURE ERROR] {e}")
+        return None
+
+# Configure Flask with explicit paths for templates and static files
+template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = FLASK_SECRET_KEY
 
 # ── Security Headers ────────────────────────────────────────────────────────
@@ -177,8 +288,9 @@ def run_enrollment(username):
             operation_status["message"] = "Scanning iris... Look straight at the camera."
             operation_status["tier_status"]["tier1"] = {"status": "running", "detail": "Capturing iris data..."}
 
-        from iris_auth import enroll_iris
-        iris_features = enroll_iris()
+        say("Scanning iris. Look straight at the camera.")
+        # Use web-compatible iris enrollment
+        iris_features = enroll_iris_web()
 
         if iris_features is None:
             with status_lock:
@@ -198,8 +310,9 @@ def run_enrollment(username):
             operation_status["message"] = "Recording voice... Speak your passphrase."
             operation_status["tier_status"]["tier2"] = {"status": "running", "detail": "Recording voice samples..."}
 
-        from voice_auth import enroll_voice
-        voice_features = enroll_voice()
+        say("Recording voice. Speak your passphrase.")
+        # Use web-compatible voice enrollment
+        voice_features = enroll_voice_web()
 
         if voice_features is None:
             with status_lock:
@@ -219,8 +332,9 @@ def run_enrollment(username):
             operation_status["message"] = "Scanning gesture... Show your hand gesture."
             operation_status["tier_status"]["tier3"] = {"status": "running", "detail": "Capturing gesture data..."}
 
-        from gesture_auth import enroll_gesture
-        gesture_features = enroll_gesture()
+        say("Scanning gesture. Show your hand gesture.")
+        # Use web-compatible gesture enrollment
+        gesture_features = enroll_gesture_web()
 
         if gesture_features is None:
             with status_lock:
@@ -242,6 +356,8 @@ def run_enrollment(username):
             operation_status["complete"] = True
             operation_status["result"] = "success"
             operation_status["message"] = f"User '{username}' enrolled successfully!"
+
+        say(f"Enrollment completed successfully for user {username}.")
 
     except Exception as e:
         log_error("enrollment", str(e))
@@ -276,8 +392,9 @@ def run_authentication():
             operation_status["message"] = "Scanning iris... Look straight at the camera."
             operation_status["tier_status"]["tier1"] = {"status": "running", "detail": "Scanning iris..."}
 
-        from iris_auth import capture_iris
-        live_iris = capture_iris()
+        say("Scanning iris. Look straight at the camera.")
+        # Use web-compatible iris capture
+        live_iris = capture_iris_web()
 
         if live_iris is None:
             with status_lock:
@@ -306,15 +423,20 @@ def run_authentication():
             record_failed_attempt()
             return
 
-        best_iris_user = max(iris_scores, key=iris_scores.get)
-        best_iris_score = iris_scores[best_iris_user]
-        iris_passed = best_iris_score >= IRIS_THRESHOLD
+        best_iris_user, best_iris_score, iris_passed, iris_disc = find_best_match(
+            iris_scores, IRIS_THRESHOLD, IRIS_MARGIN, higher_is_better=True
+        )
+        if iris_passed and not iris_disc:
+            iris_passed = False
 
         with status_lock:
             status = "passed" if iris_passed else "failed"
+            detail = f"Best match: {best_iris_user} ({best_iris_score:.1%})"
+            if not iris_disc and len(iris_scores) > 1:
+                detail += " [ambiguous]"
             operation_status["tier_status"]["tier1"] = {
                 "status": status,
-                "detail": f"Best match: {best_iris_user} ({best_iris_score:.1%})",
+                "detail": detail,
                 "score": round(best_iris_score * 100, 1),
                 "matched_user": best_iris_user,
             }
@@ -325,8 +447,9 @@ def run_authentication():
             operation_status["message"] = "Recording voice... Speak your passphrase."
             operation_status["tier_status"]["tier2"] = {"status": "running", "detail": "Recording voice..."}
 
-        from voice_auth import capture_voice
-        live_voice = capture_voice()
+        say("Recording voice. Speak your passphrase.")
+        # Use web-compatible voice capture
+        live_voice = capture_voice_web()
 
         if live_voice is None:
             with status_lock:
@@ -346,15 +469,20 @@ def run_authentication():
                 distance = dtw_distance(live_voice.T, stored_voice.T)
                 voice_scores[user] = distance
 
-        best_voice_user = min(voice_scores, key=voice_scores.get)
-        best_voice_distance = voice_scores[best_voice_user]
-        voice_passed = best_voice_distance <= VOICE_THRESHOLD
+        best_voice_user, best_voice_distance, voice_passed, voice_disc = find_best_match(
+            voice_scores, VOICE_THRESHOLD, VOICE_MARGIN, higher_is_better=False
+        )
+        if voice_passed and not voice_disc:
+            voice_passed = False
 
         with status_lock:
             status = "passed" if voice_passed else "failed"
+            detail = f"Best match: {best_voice_user} (dist: {best_voice_distance:.1f})"
+            if not voice_disc and len(voice_scores) > 1:
+                detail += " [ambiguous]"
             operation_status["tier_status"]["tier2"] = {
                 "status": status,
-                "detail": f"Best match: {best_voice_user} (dist: {best_voice_distance:.1f})",
+                "detail": detail,
                 "score": round(max(0, 100 - best_voice_distance * 2), 1),
                 "matched_user": best_voice_user,
             }
@@ -365,8 +493,9 @@ def run_authentication():
             operation_status["message"] = "Scanning gesture... Show your hand gesture."
             operation_status["tier_status"]["tier3"] = {"status": "running", "detail": "Scanning gesture..."}
 
-        from gesture_auth import capture_gesture
-        live_gesture = capture_gesture()
+        say("Scanning gesture. Show your hand gesture.")
+        # Use web-compatible gesture capture
+        live_gesture = capture_gesture_web()
 
         if live_gesture is None:
             with status_lock:
@@ -386,15 +515,20 @@ def run_authentication():
                 score = cosine_similarity(stored_gesture, live_gesture)
                 gesture_scores[user] = score
 
-        best_gesture_user = max(gesture_scores, key=gesture_scores.get)
-        best_gesture_score = gesture_scores[best_gesture_user]
-        gesture_passed = best_gesture_score >= GESTURE_THRESHOLD
+        best_gesture_user, best_gesture_score, gesture_passed, gest_disc = find_best_match(
+            gesture_scores, GESTURE_THRESHOLD, GESTURE_MARGIN, higher_is_better=True
+        )
+        if gesture_passed and not gest_disc:
+            gesture_passed = False
 
         with status_lock:
             status = "passed" if gesture_passed else "failed"
+            detail = f"Best match: {best_gesture_user} ({best_gesture_score:.1%})"
+            if not gest_disc and len(gesture_scores) > 1:
+                detail += " [ambiguous]"
             operation_status["tier_status"]["tier3"] = {
                 "status": status,
-                "detail": f"Best match: {best_gesture_user} ({best_gesture_score:.1%})",
+                "detail": detail,
                 "score": round(best_gesture_score * 100, 1),
                 "matched_user": best_gesture_user,
             }
@@ -429,6 +563,11 @@ def run_authentication():
                 f"Access GRANTED — Welcome, {identified_user}!" if all_passed
                 else "Access DENIED — Biometric verification failed."
             )
+
+        if all_passed:
+            say(f"Access granted. Welcome, {identified_user}.")
+        else:
+            say("Access denied. Biometric verification failed.")
 
     except Exception as e:
         log_error("authentication", str(e))
@@ -557,10 +696,51 @@ def api_reset():
     return jsonify({"success": True})
 
 
+def generate_frames():
+    """Generator function for MJPEG video stream."""
+    cap = None
+    try:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Error: Could not open camera")
+            return
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("Error: Could not read frame")
+                break
+
+            # Encode frame as JPEG
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if not ret:
+                print("Error: Could not encode frame")
+                continue
+
+            # Yield frame in MJPEG format
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+    except Exception as e:
+        print(f"Video streaming error: {e}")
+    finally:
+        if cap is not None:
+            cap.release()
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route."""
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("  THREE-TIER BIOMETRIC SECURITY SYSTEM")
     print("  Web Frontend — http://localhost:5000")
-    print("  🔒 Security hardening ACTIVE")
+    print("  [LOCK] Security hardening ACTIVE")
     print("=" * 60 + "\n")
     app.run(debug=False, port=5000, threaded=True)

@@ -7,6 +7,7 @@ let pollInterval = null;
 
 // ── Navigation ──────────────────────────────────────
 function showPage(page) {
+    console.log('showPage called with:', page);
     currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -14,6 +15,7 @@ function showPage(page) {
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
     if (page === 'manage') loadUsers();
     if (page === 'dashboard') loadDashboardStats();
+    console.log('Page switched to:', page);
 }
 
 // ── Dashboard ───────────────────────────────────────
@@ -27,35 +29,42 @@ async function loadDashboardStats() {
 
 // ── Enrollment ──────────────────────────────────────
 async function startEnrollment() {
+    console.log('startEnrollment called');
     const username = document.getElementById('enroll-username').value.trim();
     if (!username) { alert('Please enter a username!'); return; }
 
+    console.log('Starting enrollment for:', username);
     const res = await fetch('/api/enroll', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username })
     });
     const data = await res.json();
+    console.log('Enrollment API response:', data);
     if (!data.success) { alert(data.error); return; }
 
     document.getElementById('enroll-form').style.display = 'none';
     document.getElementById('enroll-operation').classList.add('active');
     document.getElementById('enroll-result').classList.remove('active', 'granted', 'denied');
+    document.getElementById('enroll-video-feed').style.display = 'block';
     resetTierRows('enroll');
     startPolling('enroll');
 }
 
 // ── Authentication ──────────────────────────────────
 async function startAuthentication() {
+    console.log('startAuthentication called');
     const res = await fetch('/api/authenticate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
     });
     const data = await res.json();
+    console.log('Authentication API response:', data);
     if (!data.success) { alert(data.error); return; }
 
     document.getElementById('auth-start').style.display = 'none';
     document.getElementById('auth-operation').classList.add('active');
     document.getElementById('auth-result').classList.remove('active', 'granted', 'denied');
+    document.getElementById('video-feed').style.display = 'block';
     resetTierRows('auth');
     startPolling('auth');
 }
@@ -86,16 +95,62 @@ async function pollStatus(mode) {
                 const ts = s.tier_status[tier];
                 row.classList.add(ts.status);
                 detail.textContent = ts.detail;
-                badge.textContent = ts.status === 'running' ? 'Scanning...' :
-                    ts.status === 'passed' ? 'Passed' : 'Failed';
+                badge.textContent = ts.status === 'running' ? 'SCANNING' :
+                    ts.status === 'passed' ? 'PASSED' : 'FAILED';
             } else if (s.current_tier > i + 1) {
                 row.classList.add('passed');
             } else if (s.current_tier === i + 1) {
                 row.classList.add('running');
-                badge.textContent = 'Scanning...';
+                badge.textContent = 'SCANNING';
             } else {
                 row.classList.add('waiting');
-                badge.textContent = 'Waiting';
+                badge.textContent = 'WAITING';
+            }
+        });
+
+        // Update message
+        const msgEl = document.getElementById(`${mode}-message`);
+        if (msgEl) msgEl.textContent = s.message;
+
+        // Complete
+        if (s.complete) {
+            stopPolling();
+
+            if (mode === 'enroll') {
+                const result = document.getElementById('enroll-result');
+                result.classList.add('active');
+                if (s.result === 'success') {
+                    result.classList.add('granted');
+                    result.querySelector('.result-icon').textContent = '[OK]';
+                    result.querySelector('.result-title').textContent = 'ENROLLMENT COMPLETE';
+                    result.querySelector('.result-subtitle').textContent = `User "${s.username}" enrolled successfully!`;
+                } else {
+                    result.classList.add('denied');
+                    result.querySelector('.result-icon').textContent = '[FAIL]';
+                    result.querySelector('.result-title').textContent = 'ENROLLMENT FAILED';
+                    result.querySelector('.result-subtitle').textContent = s.error || 'An error occurred.';
+                }
+            } else {
+                const result = document.getElementById('auth-result');
+                result.classList.add('active');
+                if (s.result === 'granted') {
+                    result.classList.add('granted');
+                    result.querySelector('.result-icon').textContent = '[OPEN]';
+                    result.querySelector('.result-title').textContent = 'ACCESS GRANTED';
+                    result.querySelector('.result-subtitle').textContent = `Identified as: ${s.username}`;
+                } else {
+                    result.classList.add('denied');
+                    result.querySelector('.result-icon').textContent = '[LOCKED]';
+                    result.querySelector('.result-title').textContent = 'ACCESS DENIED';
+                    result.querySelector('.result-subtitle').textContent = s.error || 'Biometric verification failed.';
+                }
+            }
+
+            // Reset server state after a delay
+            setTimeout(async () => { await fetch('/api/reset', { method: 'POST' }); }, 2000);
+        }
+    } catch (e) { console.error(e); }
+}
             }
         });
 
@@ -156,6 +211,7 @@ function resetEnrollForm() {
     document.getElementById('enroll-form').style.display = 'block';
     document.getElementById('enroll-operation').classList.remove('active');
     document.getElementById('enroll-result').classList.remove('active', 'granted', 'denied');
+    document.getElementById('enroll-video-feed').style.display = 'none';
     document.getElementById('enroll-username').value = '';
 }
 
@@ -163,6 +219,7 @@ function resetAuthPanel() {
     document.getElementById('auth-start').style.display = 'block';
     document.getElementById('auth-operation').classList.remove('active');
     document.getElementById('auth-result').classList.remove('active', 'granted', 'denied');
+    document.getElementById('video-feed').style.display = 'none';
 }
 
 // ── User Management ─────────────────────────────────
@@ -257,6 +314,8 @@ function initParticles() {
 
 // ── Init ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing...');
     initParticles();
     loadDashboardStats();
+    console.log('Initialization complete');
 });

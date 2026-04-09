@@ -125,10 +125,16 @@ def extract_mfcc_features(audio, sample_rate=SAMPLE_RATE):
         return None
 
 
-def enroll_voice():
+def enroll_voice(status_callback=None):
     """
     Capture voice features for enrollment.
     Records TWO passphrase samples and averages them for a more robust template.
+
+    Args:
+        status_callback: Optional function(sample_num, phase, detail) to report status.
+                         sample_num: 1 or 2
+                         phase: "ready", "countdown", "recording", "done", "failed"
+                         detail: human-readable text
 
     Returns:
         numpy array of MFCC features, or None if cancelled.
@@ -138,6 +144,13 @@ def enroll_voice():
         print("  [VOICE] Install with: pip install sounddevice librosa soundfile")
         return None
 
+    def _notify(sample_num, phase, detail=""):
+        if status_callback:
+            try:
+                status_callback(sample_num, phase, detail)
+            except Exception:
+                pass
+
     print("\n  [VOICE] Starting voice enrollment...")
     print("  [VOICE] You will record your passphrase 2 times for accuracy.")
     print("  [VOICE] Speak the SAME passphrase each time.\n")
@@ -146,25 +159,37 @@ def enroll_voice():
     for attempt in range(1, 3):
         print(f"  [VOICE] ── Sample {attempt}/2 ──")
         print("  [VOICE] Speak your passphrase clearly when recording begins.")
-        print("  [VOICE] Recording starts in 2 seconds...\n")
-        time.sleep(2)
 
+        # "Get ready" phase with countdown
+        _notify(attempt, "ready", f"Get ready for SAMPLE {attempt} of 2...")
+        print(f"  [VOICE] Recording starts in 3 seconds...\n")
+        for i in range(3, 0, -1):
+            _notify(attempt, "countdown", f"Sample {attempt}/2 starts in {i}...")
+            print(f"  [VOICE]   Starting in {i}...", flush=True)
+            time.sleep(1)
+
+        # Recording phase
+        _notify(attempt, "recording", f"RECORDING Sample {attempt}/2 — SPEAK NOW!")
         audio = record_audio()
         if audio is None:
             print(f"  [VOICE] Recording {attempt} failed!")
+            _notify(attempt, "failed", f"Sample {attempt} recording failed!")
             return None
 
         features = extract_mfcc_features(audio)
         if features is None:
             print(f"  [VOICE] Feature extraction failed for sample {attempt}!")
+            _notify(attempt, "failed", f"Sample {attempt} — no speech detected!")
             return None
 
         samples.append(features)
+        _notify(attempt, "done", f"Sample {attempt}/2 captured successfully!")
         print(f"  [VOICE] Sample {attempt} captured! Shape: {features.shape}")
 
         if attempt < 2:
+            _notify(attempt, "pause", "Sample 1 done! Get ready for Sample 2...")
             print("  [VOICE] Get ready for the next recording...\n")
-            time.sleep(1)
+            time.sleep(2)
 
     # Average the two samples for a more stable voice template
     # Truncate both to the shorter length to align time frames
@@ -175,6 +200,7 @@ def enroll_voice():
     print(f"\n  [VOICE] Enrollment complete! Averaged 2 samples.")
     print(f"  [VOICE] Template shape: {avg_features.shape}")
     return avg_features
+
 
 
 def capture_voice():

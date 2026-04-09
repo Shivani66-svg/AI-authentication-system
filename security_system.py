@@ -284,16 +284,22 @@ def authenticate_user():
         input("\n  Press ENTER to continue...")
         return
 
-    # Find best iris match
-    best_iris_user = max(iris_scores, key=iris_scores.get)
-    best_iris_score = iris_scores[best_iris_user]
-    iris_passed = best_iris_score >= IRIS_THRESHOLD
+    # Find best iris match with margin check
+    from utils import find_best_match
+    from config import IRIS_MARGIN, VOICE_MARGIN, GESTURE_MARGIN
+    
+    best_iris_user, best_iris_score, iris_passed, iris_disc = find_best_match(
+        iris_scores, IRIS_THRESHOLD, IRIS_MARGIN, higher_is_better=True
+    )
+    if iris_passed and not iris_disc:
+        iris_passed = False
+        print(f"\n  [TIER 1 AMBIGUOUS] Scores too close between users — cannot distinguish.")
 
     if iris_passed:
         print(f"\n  [TIER 1 PASSED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
     else:
         print(f"\n  [TIER 1 FAILED] Best match: '{best_iris_user}' (Score: {best_iris_score:.2%})")
-        print(f"  [SECURITY] No iris match found above threshold ({IRIS_THRESHOLD:.0%}).")
+        print(f"  [SECURITY] No clear iris match found above threshold ({IRIS_THRESHOLD:.0%}).")
 
     time.sleep(1)
 
@@ -323,16 +329,19 @@ def authenticate_user():
         input("\n  Press ENTER to continue...")
         return
 
-    # Find best voice match (lowest distance)
-    best_voice_user = min(voice_scores, key=voice_scores.get)
-    best_voice_distance = voice_scores[best_voice_user]
-    voice_passed = best_voice_distance <= VOICE_THRESHOLD
+    # Find best voice match with margin check
+    best_voice_user, best_voice_distance, voice_passed, voice_disc = find_best_match(
+        voice_scores, VOICE_THRESHOLD, VOICE_MARGIN, higher_is_better=False
+    )
+    if voice_passed and not voice_disc:
+        voice_passed = False
+        print(f"\n  [TIER 2 AMBIGUOUS] Scores too close between users — cannot distinguish.")
 
     if voice_passed:
         print(f"\n  [TIER 2 PASSED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
     else:
         print(f"\n  [TIER 2 FAILED] Best match: '{best_voice_user}' (Distance: {best_voice_distance:.2f})")
-        print(f"  [SECURITY] No voice match found below threshold ({VOICE_THRESHOLD}).")
+        print(f"  [SECURITY] No clear voice match found below threshold ({VOICE_THRESHOLD}).")
 
     time.sleep(1)
 
@@ -362,16 +371,19 @@ def authenticate_user():
         input("\n  Press ENTER to continue...")
         return
 
-    # Find best gesture match
-    best_gesture_user = max(gesture_scores, key=gesture_scores.get)
-    best_gesture_score = gesture_scores[best_gesture_user]
-    gesture_passed = best_gesture_score >= GESTURE_THRESHOLD
+    # Find best gesture match with margin check
+    best_gesture_user, best_gesture_score, gesture_passed, gest_disc = find_best_match(
+        gesture_scores, GESTURE_THRESHOLD, GESTURE_MARGIN, higher_is_better=True
+    )
+    if gesture_passed and not gest_disc:
+        gesture_passed = False
+        print(f"\n  [TIER 3 AMBIGUOUS] Scores too close between users — cannot distinguish.")
 
     if gesture_passed:
         print(f"\n  [TIER 3 PASSED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
     else:
         print(f"\n  [TIER 3 FAILED] Best match: '{best_gesture_user}' (Score: {best_gesture_score:.2%})")
-        print(f"  [SECURITY] No gesture match found above threshold ({GESTURE_THRESHOLD:.0%}).")
+        print(f"  [SECURITY] No clear gesture match found above threshold ({GESTURE_THRESHOLD:.0%}).")
 
     time.sleep(1)
 

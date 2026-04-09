@@ -56,9 +56,26 @@ FLASK_SECRET_KEY = os.environ.get(
 )
 
 # ── Authentication Thresholds ──────────────────────────────────────────────
-IRIS_THRESHOLD = 0.82           # Minimum cosine similarity for iris match
-VOICE_THRESHOLD = 55.0          # Maximum DTW distance for voice match
-GESTURE_THRESHOLD = 0.85        # Minimum cosine similarity for gesture match
+# These thresholds must be strict enough to prevent misidentification.
+IRIS_THRESHOLD = 0.88           # Minimum cosine similarity for iris match
+VOICE_THRESHOLD = 45.0          # Maximum DTW distance for voice match
+GESTURE_THRESHOLD = 0.90        # Minimum cosine similarity for gesture match
+
+# ── Discrimination Margin ──────────────────────────────────────────────────
+# The best match must beat the 2nd-best match by at least this margin.
+# This prevents the system from picking the wrong user when scores are close.
+IRIS_MARGIN = 0.03              # Best iris score must be 3% above 2nd best
+VOICE_MARGIN = 5.0              # Best voice distance must be 5 units below 2nd best
+GESTURE_MARGIN = 0.03           # Best gesture score must be 3% above 2nd best
+
+# ── Multi-Tier Fusion Weights ──────────────────────────────────────────────
+# How much each tier contributes to the final confidence score.
+# Voice gets lower weight because DTW is inherently noisier.
+TIER_WEIGHTS = {
+    "iris": 0.40,
+    "voice": 0.25,
+    "gesture": 0.35,
+}
 
 # ── Brute-Force Protection ─────────────────────────────────────────────────
 MAX_FAILED_ATTEMPTS = 5         # Lock after this many failures
@@ -78,3 +95,4 @@ USERNAME_PATTERN = r"^[a-zA-Z0-9_]+$"
 # ── Liveness Detection ─────────────────────────────────────────────────────
 LIVENESS_EAR_VARIANCE_THRESHOLD = 0.001  # Min eye aspect ratio variance (blink detection)
 LIVENESS_CHECK_FRAMES = 50              # Number of frames to observe for liveness
+

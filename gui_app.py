@@ -469,17 +469,41 @@ class SecurityApp(tk.Tk):
             # Tier 2: Voice
             self.after(0, lambda: self._set_tier(self.et, "t2", "running", "Recording voice..."))
             self.after(0, lambda: self.enroll_msg.configure(text="Recording voice — speak your passphrase..."))
-            self._show_mic_graphic()
-            say_wait("Voice enrollment. Speak your phrase.")
+            self._show_mic_graphic(1, "Get ready to speak your passphrase...")
+            say_wait("Voice enrollment. You will record 2 samples.")
+
+            def voice_status(sample_num, phase, detail):
+                """Callback to update GUI during voice enrollment."""
+                if phase == "ready":
+                    self._show_mic_graphic(sample_num, f"GET READY — Sample {sample_num} of 2")
+                    self.after(0, lambda d=detail: self.enroll_msg.configure(text=d))
+                elif phase == "countdown":
+                    self._show_mic_graphic(sample_num, detail, color_mode="countdown")
+                elif phase == "recording":
+                    self._show_mic_graphic(sample_num, f"🔴 RECORDING Sample {sample_num}/2 — SPEAK NOW!", color_mode="recording")
+                    self.after(0, lambda: self.enroll_msg.configure(text=f"Recording Sample {sample_num}/2 — SPEAK NOW!"))
+                    if sample_num == 1:
+                        say("Speak now.")
+                    else:
+                        say("Speak again.")
+                elif phase == "done":
+                    self._show_mic_graphic(sample_num, f"✅ Sample {sample_num}/2 captured!", color_mode="done")
+                    self.after(0, lambda d=detail: self._set_tier(self.et, "t2", "running", d))
+                elif phase == "pause":
+                    self._show_mic_graphic(2, "Sample 1 done! Get ready for Sample 2...", color_mode="countdown")
+                    self.after(0, lambda: self.enroll_msg.configure(text="Get ready for Sample 2..."))
+                elif phase == "failed":
+                    self._show_mic_graphic(sample_num, f"❌ {detail}", color_mode="failed")
+
             from voice_auth import enroll_voice
-            voice = enroll_voice()
+            voice = enroll_voice(status_callback=voice_status)
             if voice is None:
                 say("Enrollment failed.")
                 cam.release()
                 cam = None
                 self.after(0, lambda: self._enroll_done(False, "Voice enrollment failed."))
                 return
-            self.after(0, lambda: self._set_tier(self.et, "t2", "passed", "Voice captured!"))
+            self.after(0, lambda: self._set_tier(self.et, "t2", "passed", "Voice captured! (2 samples)"))
 
             time.sleep(3)  # 3-second pause between tiers
 
@@ -517,24 +541,87 @@ class SecurityApp(tk.Tk):
             say("Enrollment failed.")
             self.after(0, lambda: self._enroll_done(False, str(e)))
 
-    def _show_mic_graphic(self):
-        """Show a microphone graphic on the camera panel during voice recording."""
+    def _show_mic_graphic(self, sample_num=1, status_text="", color_mode="default", mode="enroll"):
+        """Show a microphone graphic with sample number and status.
+        
+        Args:
+            sample_num: Which sample (1 or 2) — only used in enroll mode
+            status_text: Text to display below the mic icon
+            color_mode: 'default', 'countdown', 'recording', 'done', 'failed'
+            mode: 'enroll' (shows sample dots) or 'auth' (simple display)
+        """
         mic = np.zeros((CAM_H, CAM_W, 3), dtype=np.uint8)
         mic[:] = (10, 14, 26)
-        # Draw microphone icon
-        cx, cy = CAM_W // 2, CAM_H // 2 - 30
-        cv2.ellipse(mic, (cx, cy - 20), (25, 40), 0, 0, 360, (0, 229, 255), 3)
-        cv2.line(mic, (cx, cy + 20), (cx, cy + 50), (0, 229, 255), 3)
-        cv2.line(mic, (cx - 20, cy + 50), (cx + 20, cy + 50), (0, 229, 255), 3)
-        cv2.ellipse(mic, (cx, cy + 5), (35, 50), 0, 0, 180, (0, 229, 255), 2)
-        # Text
-        cv2.putText(mic, "VOICE RECORDING", (cx - 110, cy + 90),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 229, 255), 2, cv2.LINE_AA)
-        cv2.putText(mic, "Speak your passphrase clearly...", (cx - 155, cy + 120),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (122, 133, 153), 1, cv2.LINE_AA)
-        # Pulsing rings
-        for r in [60, 80, 100]:
-            cv2.circle(mic, (cx, cy), r, (20, 40, 60), 1, cv2.LINE_AA)
+
+        # Color scheme based on mode
+        colors = {
+            "default":   {"main": (0, 229, 255),  "ring": (20, 40, 60),   "bg_bar": (30, 30, 40)},
+            "countdown": {"main": (0, 165, 255),  "ring": (40, 40, 20),   "bg_bar": (40, 35, 15)},
+            "recording": {"main": (0, 0, 255),    "ring": (40, 20, 30),   "bg_bar": (50, 15, 15)},
+            "done":      {"main": (0, 200, 100),  "ring": (20, 50, 30),   "bg_bar": (15, 50, 20)},
+            "failed":    {"main": (0, 0, 200),    "ring": (40, 15, 15),   "bg_bar": (50, 10, 10)},
+        }
+        c = colors.get(color_mode, colors["default"])
+
+        cx, cy = CAM_W // 2, CAM_H // 2 - 40
+
+        # Top banner
+        banner_color = c["bg_bar"]
+        cv2.rectangle(mic, (0, 0), (CAM_W, 55), banner_color, -1)
+
+        if mode == "enroll":
+            banner_text = f"VOICE ENROLLMENT — SAMPLE {sample_num} OF 2"
+            cv2.putText(mic, banner_text, (CAM_W // 2 - 220, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, c["main"], 2, cv2.LINE_AA)
+
+            # Progress dots (only for enrollment)
+            dot1_color = (0, 200, 100) if sample_num >= 1 else (60, 60, 60)
+            dot2_color = (0, 200, 100) if sample_num >= 2 and color_mode in ("recording", "done") else (60, 60, 60)
+            if color_mode == "recording" and sample_num == 1:
+                dot1_color = (0, 0, 255)  # red = recording
+            elif color_mode == "recording" and sample_num == 2:
+                dot1_color = (0, 200, 100)  # green = done
+                dot2_color = (0, 0, 255)    # red = recording
+            elif color_mode == "done":
+                if sample_num == 1:
+                    dot1_color = (0, 200, 100)
+                else:
+                    dot1_color = (0, 200, 100)
+                    dot2_color = (0, 200, 100)
+
+            cv2.circle(mic, (CAM_W // 2 - 20, 45), 6, dot1_color, -1, cv2.LINE_AA)
+            cv2.circle(mic, (CAM_W // 2 + 20, 45), 6, dot2_color, -1, cv2.LINE_AA)
+            cv2.putText(mic, "1", (CAM_W // 2 - 23, 49), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+            cv2.putText(mic, "2", (CAM_W // 2 + 17, 49), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+        else:
+            # Auth mode — simple banner
+            banner_text = "VOICE VERIFICATION"
+            cv2.putText(mic, banner_text, (CAM_W // 2 - 130, 35),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, c["main"], 2, cv2.LINE_AA)
+
+        # Microphone icon
+        cv2.ellipse(mic, (cx, cy - 20), (25, 40), 0, 0, 360, c["main"], 3)
+        cv2.line(mic, (cx, cy + 20), (cx, cy + 50), c["main"], 3)
+        cv2.line(mic, (cx - 20, cy + 50), (cx + 20, cy + 50), c["main"], 3)
+        cv2.ellipse(mic, (cx, cy + 5), (35, 50), 0, 0, 180, c["main"], 2)
+
+        # Pulsing rings (larger when recording)
+        ring_sizes = [60, 80, 100] if color_mode != "recording" else [60, 85, 110, 135]
+        for r in ring_sizes:
+            cv2.circle(mic, (cx, cy), r, c["ring"], 1, cv2.LINE_AA)
+
+        # Status text
+        if status_text:
+            # Measure text to center it
+            text_size = cv2.getTextSize(status_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+            text_x = (CAM_W - text_size[0]) // 2
+            cv2.putText(mic, status_text, (text_x, cy + 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, c["main"], 2, cv2.LINE_AA)
+
+        # Bottom hint
+        hint = "Say the SAME passphrase for both samples"
+        cv2.putText(mic, hint, (CAM_W // 2 - 185, CAM_H - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 120), 1, cv2.LINE_AA)
 
         img = Image.fromarray(cv2.cvtColor(mic, cv2.COLOR_BGR2RGB))
         self.after(0, lambda: self._display_cam(img))
@@ -671,18 +758,27 @@ class SecurityApp(tk.Tk):
             for u in users:
                 d = load_user_data(u)
                 if d: iris_scores[u] = cosine_similarity(d[0], live_iris)
-            best_iris = max(iris_scores, key=iris_scores.get)
-            iris_sc = iris_scores[best_iris]
-            iris_ok = iris_sc >= IRIS_THRESHOLD
+            
+            from utils import find_best_match
+            from config import IRIS_MARGIN, VOICE_MARGIN, GESTURE_MARGIN
+            
+            best_iris, iris_sc, iris_ok, iris_disc = find_best_match(
+                iris_scores, IRIS_THRESHOLD, IRIS_MARGIN, higher_is_better=True
+            )
+            if iris_ok and not iris_disc:
+                iris_ok = False  # Scores too close — can't distinguish users
             s = "passed" if iris_ok else "failed"
-            self.after(0, lambda: self._set_tier(self.at, "t1", s, f"Best: {best_iris} ({iris_sc:.0%})"))
+            detail = f"Best: {best_iris} ({iris_sc:.0%})"
+            if not iris_disc and len(iris_scores) > 1:
+                detail += " [ambiguous]"
+            self.after(0, lambda: self._set_tier(self.at, "t1", s, detail))
 
             time.sleep(3)  # 3-second pause between tiers
 
             # Tier 2: Voice
             self.after(0, lambda: self._set_tier(self.at, "t2", "running", "Recording voice..."))
             self.after(0, lambda: self.auth_msg.configure(text="Recording voice — speak your passphrase..."))
-            self._show_mic_graphic()
+            self._show_mic_graphic(status_text="Speak your passphrase clearly...", mode="auth")
             say_wait("Voice authentication. Speak your passphrase.")
             from voice_auth import capture_voice
             live_voice = capture_voice()
@@ -697,11 +793,17 @@ class SecurityApp(tk.Tk):
             for u in users:
                 d = load_user_data(u)
                 if d: voice_scores[u] = dtw_distance(live_voice.T, d[1].T)
-            best_voice = min(voice_scores, key=voice_scores.get)
-            voice_d = voice_scores[best_voice]
-            voice_ok = voice_d <= VOICE_THRESHOLD
+            
+            best_voice, voice_d, voice_ok, voice_disc = find_best_match(
+                voice_scores, VOICE_THRESHOLD, VOICE_MARGIN, higher_is_better=False
+            )
+            if voice_ok and not voice_disc:
+                voice_ok = False  # Scores too close
             s = "passed" if voice_ok else "failed"
-            self.after(0, lambda: self._set_tier(self.at, "t2", s, f"Best: {best_voice} (dist: {voice_d:.1f})"))
+            detail = f"Best: {best_voice} (dist: {voice_d:.1f})"
+            if not voice_disc and len(voice_scores) > 1:
+                detail += " [ambiguous]"
+            self.after(0, lambda: self._set_tier(self.at, "t2", s, detail))
 
             time.sleep(3)  # 3-second pause between tiers
 
@@ -726,16 +828,22 @@ class SecurityApp(tk.Tk):
             for u in users:
                 d = load_user_data(u)
                 if d: gest_scores[u] = cosine_similarity(d[2], live_gesture)
-            best_gest = max(gest_scores, key=gest_scores.get)
-            gest_sc = gest_scores[best_gest]
-            gest_ok = gest_sc >= GESTURE_THRESHOLD
+            
+            best_gest, gest_sc, gest_ok, gest_disc = find_best_match(
+                gest_scores, GESTURE_THRESHOLD, GESTURE_MARGIN, higher_is_better=True
+            )
+            if gest_ok and not gest_disc:
+                gest_ok = False  # Scores too close
             s = "passed" if gest_ok else "failed"
-            self.after(0, lambda: self._set_tier(self.at, "t3", s, f"Best: {best_gest} ({gest_sc:.0%})"))
+            detail = f"Best: {best_gest} ({gest_sc:.0%})"
+            if not gest_disc and len(gest_scores) > 1:
+                detail += " [ambiguous]"
+            self.after(0, lambda: self._set_tier(self.at, "t3", s, detail))
 
             cam.release()
             cam = None
 
-            # Decision
+            # Decision — all tiers must pass AND match the SAME user
             all_ok = iris_ok and voice_ok and gest_ok
             same = (best_iris == best_voice == best_gest)
 
@@ -752,12 +860,13 @@ class SecurityApp(tk.Tk):
                 self.after(0, lambda: self._auth_done(True, f"Identified as: {best_iris}"))
             elif all_ok:
                 _record_fail()
-                log_authentication("CONFLICT", False, auth_scores)
+                log_authentication("CONFLICT", False, auth_scores,
+                    detail=f"iris={best_iris} voice={best_voice} gesture={best_gest}")
                 say("Authentication failed.")
                 self.after(0, lambda: self._auth_done(False, "Conflict — tiers matched different users."))
             else:
                 _record_fail()
-                log_authentication(best_iris, False, auth_scores)
+                log_authentication(best_iris or "unknown", False, auth_scores)
                 say("Authentication failed.")
                 self.after(0, lambda: self._auth_done(False, "Biometric verification failed."))
 
