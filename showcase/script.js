@@ -50,6 +50,27 @@ function animateParticles() {
 }
 animateParticles();
 
+/* ── Mobile Menu Toggle ───────────────────────────────────── */
+const mobileToggle = document.getElementById('mobile-toggle');
+const mobileMenu   = document.getElementById('mobile-menu');
+
+function closeMobileMenu() {
+    mobileMenu.classList.remove('open');
+    mobileToggle.textContent = '☰';
+}
+
+mobileToggle.addEventListener('click', () => {
+    const isOpen = mobileMenu.classList.toggle('open');
+    mobileToggle.textContent = isOpen ? '✕' : '☰';
+});
+
+// Close menu when tapping outside
+document.addEventListener('click', e => {
+    if (!mobileMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+        closeMobileMenu();
+    }
+});
+
 /* ── Scroll Reveal ────────────────────────────────────────── */
 const revealObserver = new IntersectionObserver(entries => {
     entries.forEach((e, i) => {
