@@ -7,431 +7,489 @@
     <meta name="description" content="A multi-layered biometric security system using Iris Detection, Voice Recognition, and Hand Gesture Recognition for secure user authentication.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Animated background -->
-    <div class="bg-grid"></div>
-    <div class="bg-glow bg-glow-1"></div>
-    <div class="bg-glow bg-glow-2"></div>
-    <div class="bg-glow bg-glow-3"></div>
 
-    <!-- Navigation -->
-    <nav class="navbar" id="navbar">
-        <div class="nav-container">
-            <a href="#" class="nav-logo">
-                <span class="logo-icon">🔒</span>
-                <span class="logo-text">SECURITIX</span>
+<!-- Particles canvas -->
+<canvas id="particles-canvas"></canvas>
+
+<!-- Navigation -->
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="#" class="nav-logo">
+            <div class="logo-shield">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <span class="logo-text">SECURITIX</span>
+        </a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#trial">Try Demo</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#security">Security</a>
+            <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank" class="nav-cta">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                GitHub
             </a>
-            <div class="nav-links">
-                <a href="#features">Features</a>
-                <a href="#how-it-works">How It Works</a>
-                <a href="#architecture">Architecture</a>
-                <a href="#security">Security</a>
-                <a href="#tech-stack">Tech Stack</a>
-                <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank" class="nav-btn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    View on GitHub
-                </a>
+        </div>
+        <button class="nav-mobile-btn" id="mobile-toggle">☰</button>
+    </div>
+</nav>
+
+<!-- ═══════════════════════ HERO ═══════════════════════ -->
+<section class="hero" id="hero">
+    <div class="hero-bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="hero-content">
+        <div class="hero-eyebrow">
+            <span class="pulse-dot"></span>
+            <span>AI-Powered Biometric Security System</span>
+        </div>
+        <h1 class="hero-title">
+            Three Layers of<br>
+            <span class="hero-gradient">Unbreakable Security</span>
+        </h1>
+        <p class="hero-desc">
+            Iris → Voice → Gesture. All three must match. All encrypted.
+            <br>Zero false positives. Zero data leaks.
+        </p>
+        <div class="hero-cta-group">
+            <a href="#trial" class="btn-hero-primary">
+                <span class="btn-icon">▶</span> Try Interactive Demo
+            </a>
+            <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank" class="btn-hero-ghost">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                View Source
+            </a>
+        </div>
+
+        <!-- Floating stat cards -->
+        <div class="hero-stats">
+            <div class="stat-card reveal-stat" style="--d:0s">
+                <div class="stat-val">3</div>
+                <div class="stat-lbl">Biometric Tiers</div>
+            </div>
+            <div class="stat-card reveal-stat" style="--d:.1s">
+                <div class="stat-val">12</div>
+                <div class="stat-lbl">Security Layers</div>
+            </div>
+            <div class="stat-card reveal-stat" style="--d:.2s">
+                <div class="stat-val">AES-128</div>
+                <div class="stat-lbl">Encryption</div>
+            </div>
+            <div class="stat-card reveal-stat" style="--d:.3s">
+                <div class="stat-val">0%</div>
+                <div class="stat-lbl">Data Leaked</div>
             </div>
         </div>
-    </nav>
+    </div>
 
-    <!-- Hero Section -->
-    <section class="hero" id="hero">
-        <div class="hero-content">
-            <div class="hero-badge">🛡️ AI-Powered Biometric Security</div>
-            <h1 class="hero-title">
-                Three-Tier
-                <span class="gradient-text">AI Authentication</span>
-                System
-            </h1>
-            <p class="hero-subtitle">
-                A multi-layered biometric security system combining
-                <strong>Iris Detection</strong>, <strong>Voice Recognition</strong>, and
-                <strong>Hand Gesture Recognition</strong> — all three must match for access.
-            </p>
-            <div class="hero-actions">
-                <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    View Source Code
-                </a>
-                <a href="#how-it-works" class="btn btn-outline">See How It Works ↓</a>
-            </div>
-
-            <!-- Hero Stats -->
-            <div class="hero-stats">
-                <div class="stat">
-                    <span class="stat-number">3</span>
-                    <span class="stat-label">Biometric Tiers</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number">12</span>
-                    <span class="stat-label">Security Layers</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number">AES-128</span>
-                    <span class="stat-label">Encryption</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number">100%</span>
-                    <span class="stat-label">Offline</span>
-                </div>
-            </div>
+    <!-- Floating biometric icons -->
+    <div class="hero-floaters">
+        <div class="floater floater-iris">
+            <div class="floater-inner">👁️<span>Iris</span></div>
         </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="section" id="features">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Core Capabilities</span>
-                <h2 class="section-title">What Makes Securitix Different</h2>
-                <p class="section-subtitle">Not just one biometric — three tiers working together, all secured with military-grade encryption.</p>
-            </div>
-
-            <div class="features-grid">
-                <div class="feature-card feature-highlight">
-                    <div class="feature-icon">👁️</div>
-                    <h3>Iris Detection</h3>
-                    <p>MediaPipe Face Mesh extracts 28 iris geometry features — eye shape ratios, inter-iris distance, and pupil positioning. Cosine similarity matching at 88% threshold.</p>
-                    <div class="feature-tech">Tier 1 · MediaPipe · OpenCV</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎤</div>
-                    <h3>Voice Recognition</h3>
-                    <p>Records your passphrase, extracts 13-coefficient MFCC features, and compares using Dynamic Time Warping. Two samples averaged during enrollment for stability.</p>
-                    <div class="feature-tech">Tier 2 · librosa · DTW</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">✋</div>
-                    <h3>Gesture Recognition</h3>
-                    <p>MediaPipe Hands tracks 21 3D landmarks, finger angles, and inter-finger distances — 83 features total. Your unique hand gesture becomes your key.</p>
-                    <div class="feature-tech">Tier 3 · MediaPipe · 83 Features</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3>AES Encryption</h3>
-                    <p>All biometric templates encrypted at rest using Fernet (AES-128-CBC + HMAC-SHA256). Keys are machine-bound — data can't be decrypted on another computer.</p>
-                    <div class="feature-tech">Fernet · Machine-Bound Keys</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🫣</div>
-                    <h3>Liveness Detection</h3>
-                    <p>Blink detection via Eye Aspect Ratio variance prevents spoofing with photos or videos. No blinks detected = rejected as non-live.</p>
-                    <div class="feature-tech">Anti-Spoofing · EAR Variance</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
-                    <h3>Smart Matching</h3>
-                    <p>Discrimination margin ensures the best match is significantly better than the 2nd best — preventing misidentification when users have similar biometrics.</p>
-                    <div class="feature-tech">Margin Check · Multi-Tier Fusion</div>
-                </div>
-            </div>
+        <div class="floater floater-voice">
+            <div class="floater-inner">🎤<span>Voice</span></div>
         </div>
-    </section>
+        <div class="floater floater-gesture">
+            <div class="floater-inner">✋<span>Gesture</span></div>
+        </div>
+    </div>
 
-    <!-- How It Works -->
-    <section class="section section-dark" id="how-it-works">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Authentication Flow</span>
-                <h2 class="section-title">How It Works</h2>
-                <p class="section-subtitle">Two phases — enroll once, authenticate anytime. All three tiers must match the same user.</p>
-            </div>
+    <div class="scroll-hint">
+        <div class="scroll-line"></div>
+        <span>Scroll to explore</span>
+    </div>
+</section>
 
-            <!-- Enrollment Flow -->
-            <div class="flow-section">
-                <h3 class="flow-title">📝 Enrollment</h3>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h4>Enter Username</h4>
-                            <p>Alphanumeric + underscore only. Path traversal attacks are blocked.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h4>Iris Capture</h4>
-                            <p>50 frames captured with blink-based liveness verification.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h4>Voice Recording ×2</h4>
-                            <p>Passphrase recorded twice and averaged for a stable voice template.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step">
-                        <div class="step-number">4</div>
-                        <div class="step-content">
-                            <h4>Gesture Capture</h4>
-                            <p>30 frames of your unique hand gesture captured with landmark tracking.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step step-final">
-                        <div class="step-number">5</div>
-                        <div class="step-content">
-                            <h4>Encrypt & Store</h4>
-                            <p>All features encrypted (AES-128) and saved locally. No raw images stored.</p>
-                        </div>
-                    </div>
+<!-- ═══════════════════════ FEATURES ═══════════════════════ -->
+<section class="section" id="features">
+    <div class="container">
+        <div class="section-header reveal">
+            <div class="tag">Core Capabilities</div>
+            <h2 class="section-title">What Makes Securitix Different</h2>
+            <p class="section-sub">Not one biometric — three working in concert. No single point of failure.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feat-card reveal" style="--accent-c: #6c5ce7">
+                <div class="feat-glow"></div>
+                <div class="feat-num">01</div>
+                <div class="feat-icon">👁️</div>
+                <h3>Iris Detection</h3>
+                <p>MediaPipe Face Mesh extracts 28 iris geometry ratios. Cosine similarity at 88% threshold with blink-based liveness detection.</p>
+                <div class="feat-tags">
+                    <span>MediaPipe</span><span>OpenCV</span><span>88% threshold</span>
                 </div>
             </div>
-
-            <!-- Authentication Flow -->
-            <div class="flow-section">
-                <h3 class="flow-title">🔓 Authentication</h3>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h4>Auto-Identify</h4>
-                            <p>No username needed. The system scans against ALL enrolled users.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h4>3-Tier Biometric Scan</h4>
-                            <p>Iris → Voice → Gesture. Each tier compared via threshold + margin check.</p>
-                        </div>
-                    </div>
-                    <div class="flow-connector"></div>
-                    <div class="flow-step step-final">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h4>Identity Fusion</h4>
-                            <p>All 3 tiers must pass AND match the same user. Otherwise → denied.</p>
-                        </div>
-                    </div>
+            <div class="feat-card reveal" style="--accent-c: #00d2ff">
+                <div class="feat-glow"></div>
+                <div class="feat-num">02</div>
+                <div class="feat-icon">🎤</div>
+                <h3>Voice Recognition</h3>
+                <p>13-coefficient MFCC features with Dynamic Time Warping. Two samples averaged during enrollment for rock-solid templates.</p>
+                <div class="feat-tags">
+                    <span>librosa</span><span>MFCC</span><span>DTW</span>
+                </div>
+            </div>
+            <div class="feat-card reveal" style="--accent-c: #00e676">
+                <div class="feat-glow"></div>
+                <div class="feat-num">03</div>
+                <div class="feat-icon">✋</div>
+                <h3>Gesture Recognition</h3>
+                <p>83-feature vectors from 21 hand landmarks + finger angles + inter-finger distances. Your unique pose is your key.</p>
+                <div class="feat-tags">
+                    <span>MediaPipe Hands</span><span>83 features</span><span>90% threshold</span>
+                </div>
+            </div>
+            <div class="feat-card reveal" style="--accent-c: #fd79a8">
+                <div class="feat-glow"></div>
+                <div class="feat-num">04</div>
+                <div class="feat-icon">🔐</div>
+                <h3>Encrypted At Rest</h3>
+                <p>All biometric templates stored as AES-128-CBC encrypted `.enc` files. Machine-bound keys — non-transferable between computers.</p>
+                <div class="feat-tags">
+                    <span>Fernet</span><span>HMAC-SHA256</span><span>Machine-Bound</span>
+                </div>
+            </div>
+            <div class="feat-card reveal" style="--accent-c: #fdcb6e">
+                <div class="feat-glow"></div>
+                <div class="feat-num">05</div>
+                <div class="feat-icon">🫣</div>
+                <h3>Liveness Detection</h3>
+                <p>Eye Aspect Ratio variance catches spoofing attempts. Photos and videos fail because they don't blink with enough variance.</p>
+                <div class="feat-tags">
+                    <span>EAR Variance</span><span>Anti-Spoof</span><span>Real-time</span>
+                </div>
+            </div>
+            <div class="feat-card reveal" style="--accent-c: #e17055">
+                <div class="feat-glow"></div>
+                <div class="feat-num">06</div>
+                <div class="feat-icon">🎯</div>
+                <h3>Discrimination Margin</h3>
+                <p>Best match must beat 2nd-best by a clear margin. Prevents ambiguous matches when multiple enrolled users have similar biometrics.</p>
+                <div class="feat-tags">
+                    <span>3% Iris Margin</span><span>5u Voice Margin</span>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Architecture Section -->
-    <section class="section" id="architecture">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">System Design</span>
-                <h2 class="section-title">Architecture</h2>
-            </div>
-
-            <div class="arch-grid">
-                <div class="arch-card">
-                    <div class="arch-header">
-                        <span class="arch-icon">🖥️</span>
-                        <h3>Desktop GUI</h3>
-                        <span class="arch-badge">gui_app.py</span>
-                    </div>
-                    <p>Full Tkinter application with embedded camera feed, real-time tier status, and voice assistant feedback.</p>
-                </div>
-                <div class="arch-card">
-                    <div class="arch-header">
-                        <span class="arch-icon">💻</span>
-                        <h3>Console App</h3>
-                        <span class="arch-badge">security_system.py</span>
-                    </div>
-                    <p>Terminal-based menu interface for quick enrollment and authentication via command line.</p>
-                </div>
-                <div class="arch-card">
-                    <div class="arch-header">
-                        <span class="arch-icon">🌐</span>
-                        <h3>Web API</h3>
-                        <span class="arch-badge">app.py</span>
-                    </div>
-                    <p>Flask-based REST API with security headers, rate limiting, and brute-force protection.</p>
-                </div>
-            </div>
-
-            <!-- File Structure -->
-            <div class="code-block">
-                <div class="code-header">
-                    <span class="code-dot red"></span>
-                    <span class="code-dot yellow"></span>
-                    <span class="code-dot green"></span>
-                    <span class="code-title">Project Structure</span>
-                </div>
-                <pre class="code-content"><code>AI-authentication-system/
-├── gui_app.py              <span class="code-comment"># Desktop GUI (Tkinter)</span>
-├── security_system.py      <span class="code-comment"># Console app (terminal)</span>
-├── app.py                  <span class="code-comment"># Web API (Flask)</span>
-│
-├── iris_auth.py            <span class="code-comment"># Tier 1: Iris detection</span>
-├── voice_auth.py           <span class="code-comment"># Tier 2: Voice recognition</span>
-├── gesture_auth.py         <span class="code-comment"># Tier 3: Hand gesture</span>
-│
-├── database.py             <span class="code-comment"># Encrypted data storage</span>
-├── config.py               <span class="code-comment"># Security configuration</span>
-├── crypto_utils.py         <span class="code-comment"># AES encryption utilities</span>
-├── security_logger.py      <span class="code-comment"># Audit event logging</span>
-├── utils.py                <span class="code-comment"># DTW, cosine similarity, matching</span>
-├── voice_assistant.py      <span class="code-comment"># Text-to-speech feedback</span>
-│
-├── user_data/              <span class="code-comment"># Encrypted biometric templates</span>
-├── security_logs/          <span class="code-comment"># Timestamped audit logs</span>
-└── requirements.txt        <span class="code-comment"># Python dependencies</span></code></pre>
-            </div>
+<!-- ═══════════════════════ TRIAL / DEMO ═══════════════════════ -->
+<section class="section section-trial" id="trial">
+    <div class="trial-bg"></div>
+    <div class="container">
+        <div class="section-header reveal">
+            <div class="tag tag-green">Interactive Demo</div>
+            <h2 class="section-title">Experience the Authentication Flow</h2>
+            <p class="section-sub">Simulate a live Securitix authentication session — step by step, just like the real app.</p>
         </div>
-    </section>
 
-    <!-- Security Section -->
-    <section class="section section-dark" id="security">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Defense in Depth</span>
-                <h2 class="section-title">12 Security Layers</h2>
-                <p class="section-subtitle">Multiple overlapping protections ensure no single point of failure.</p>
+        <div class="trial-wrapper reveal">
+            <!-- Left: Auth terminal -->
+            <div class="trial-panel">
+                <!-- Status bar -->
+                <div class="trial-statusbar">
+                    <div class="sbar-dots">
+                        <span class="sbar-dot red"></span>
+                        <span class="sbar-dot yellow"></span>
+                        <span class="sbar-dot green"></span>
+                    </div>
+                    <span class="sbar-title">SECURITIX Authentication Terminal</span>
+                    <span class="sbar-status" id="status-badge">Idle</span>
+                </div>
+
+                <!-- Tier progress -->
+                <div class="tier-bar">
+                    <div class="tier-item" id="tier-iris">
+                        <div class="tier-icon">👁️</div>
+                        <div class="tier-label">Iris</div>
+                        <div class="tier-state" id="iris-state">—</div>
+                    </div>
+                    <div class="tier-arrow">→</div>
+                    <div class="tier-item" id="tier-voice">
+                        <div class="tier-icon">🎤</div>
+                        <div class="tier-label">Voice</div>
+                        <div class="tier-state" id="voice-state">—</div>
+                    </div>
+                    <div class="tier-arrow">→</div>
+                    <div class="tier-item" id="tier-gesture">
+                        <div class="tier-icon">✋</div>
+                        <div class="tier-label">Gesture</div>
+                        <div class="tier-state" id="gesture-state">—</div>
+                    </div>
+                </div>
+
+                <!-- Terminal output -->
+                <div class="terminal-output" id="terminal">
+                    <div class="term-line term-info">SECURITIX v2.0 — Three-Tier Biometric Auth</div>
+                    <div class="term-line term-dim">─────────────────────────────────────────</div>
+                    <div class="term-line term-muted">Ready. Press "Start Demo Authentication" to begin.</div>
+                    <div class="term-cursor" id="cursor">▋</div>
+                </div>
+
+                <!-- Scan visualizer -->
+                <div class="scan-viz" id="scan-viz">
+                    <canvas id="scan-canvas" width="460" height="140"></canvas>
+                </div>
+
+                <!-- Controls -->
+                <div class="trial-controls">
+                    <button class="trial-btn-primary" id="start-btn" onclick="startDemo()">
+                        <span id="btn-icon">▶</span>
+                        <span id="btn-text">Start Demo Authentication</span>
+                    </button>
+                    <button class="trial-btn-ghost" onclick="resetDemo()">↺ Reset</button>
+                </div>
             </div>
 
-            <div class="security-grid">
-                <div class="sec-item"><span class="sec-icon">🔐</span><span class="sec-name">AES-128 Encryption</span><span class="sec-desc">Biometric data encrypted at rest</span></div>
-                <div class="sec-item"><span class="sec-icon">👁️</span><span class="sec-name">Liveness Detection</span><span class="sec-desc">Blink-based anti-spoofing</span></div>
-                <div class="sec-item"><span class="sec-icon">🚫</span><span class="sec-name">Brute-Force Lockout</span><span class="sec-desc">5 fails → 60s cooldown</span></div>
-                <div class="sec-item"><span class="sec-icon">🎯</span><span class="sec-name">Discrimination Margin</span><span class="sec-desc">Prevents ambiguous matches</span></div>
-                <div class="sec-item"><span class="sec-icon">🛡️</span><span class="sec-name">Path Traversal Block</span><span class="sec-desc">Username validation</span></div>
-                <div class="sec-item"><span class="sec-icon">📋</span><span class="sec-name">Audit Logging</span><span class="sec-desc">Every event timestamped</span></div>
-                <div class="sec-item"><span class="sec-icon">⏱️</span><span class="sec-name">Rate Limiting</span><span class="sec-desc">API request throttling</span></div>
-                <div class="sec-item"><span class="sec-icon">🔑</span><span class="sec-name">Machine-Bound Keys</span><span class="sec-desc">Data non-transferable</span></div>
-                <div class="sec-item"><span class="sec-icon">📦</span><span class="sec-name">No allow_pickle</span><span class="sec-desc">Prevents code injection</span></div>
-                <div class="sec-item"><span class="sec-icon">🌐</span><span class="sec-name">Security Headers</span><span class="sec-desc">CSP, X-Frame-Options</span></div>
-                <div class="sec-item"><span class="sec-icon">🤫</span><span class="sec-name">Generic Errors</span><span class="sec-desc">No info leakage</span></div>
-                <div class="sec-item"><span class="sec-icon">💾</span><span class="sec-name">No Raw Data</span><span class="sec-desc">Only math features stored</span></div>
-            </div>
-        </div>
-    </section>
+            <!-- Right: Live score display -->
+            <div class="trial-scores">
+                <div class="score-header">Live Match Scores</div>
 
-    <!-- Tech Stack -->
-    <section class="section" id="tech-stack">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Built With</span>
-                <h2 class="section-title">Technology Stack</h2>
-            </div>
+                <div class="score-tier" id="score-iris-block">
+                    <div class="score-tier-header">
+                        <span>👁️ Iris Scan</span>
+                        <span class="score-value" id="score-iris">—</span>
+                    </div>
+                    <div class="score-bar-bg">
+                        <div class="score-bar-fill" id="bar-iris" style="width:0%"></div>
+                    </div>
+                    <div class="score-threshold">Threshold: 88%</div>
+                </div>
 
-            <div class="tech-grid">
-                <div class="tech-card">
-                    <div class="tech-name">Python 3.10</div>
-                    <div class="tech-role">Core Language</div>
+                <div class="score-tier" id="score-voice-block">
+                    <div class="score-tier-header">
+                        <span>🎤 Voice Match</span>
+                        <span class="score-value" id="score-voice">—</span>
+                    </div>
+                    <div class="score-bar-bg">
+                        <div class="score-bar-fill" id="bar-voice" style="width:0%"></div>
+                    </div>
+                    <div class="score-threshold">DTW Distance ≤ 45.0</div>
                 </div>
-                <div class="tech-card">
-                    <div class="tech-name">OpenCV</div>
-                    <div class="tech-role">Camera & Image Processing</div>
+
+                <div class="score-tier" id="score-gesture-block">
+                    <div class="score-tier-header">
+                        <span>✋ Gesture Match</span>
+                        <span class="score-value" id="score-gesture">—</span>
+                    </div>
+                    <div class="score-bar-bg">
+                        <div class="score-bar-fill" id="bar-gesture" style="width:0%"></div>
+                    </div>
+                    <div class="score-threshold">Threshold: 90%</div>
                 </div>
-                <div class="tech-card">
-                    <div class="tech-name">MediaPipe</div>
-                    <div class="tech-role">Face Mesh & Hand Tracking</div>
+
+                <!-- Final verdict -->
+                <div class="verdict-box" id="verdict-box">
+                    <div class="verdict-icon" id="verdict-icon">🔒</div>
+                    <div class="verdict-text" id="verdict-text">Awaiting scan...</div>
+                    <div class="verdict-user" id="verdict-user"></div>
                 </div>
-                <div class="tech-card">
-                    <div class="tech-name">librosa</div>
-                    <div class="tech-role">MFCC Feature Extraction</div>
-                </div>
-                <div class="tech-card">
-                    <div class="tech-name">NumPy / SciPy</div>
-                    <div class="tech-role">Scientific Computing</div>
-                </div>
-                <div class="tech-card">
-                    <div class="tech-name">Flask</div>
-                    <div class="tech-role">Web Framework</div>
-                </div>
-                <div class="tech-card">
-                    <div class="tech-name">Tkinter</div>
-                    <div class="tech-role">Desktop GUI</div>
-                </div>
-                <div class="tech-card">
-                    <div class="tech-name">Fernet / AES</div>
-                    <div class="tech-role">Encryption</div>
+
+                <!-- Security events log -->
+                <div class="events-log">
+                    <div class="events-header">Security Events</div>
+                    <div class="events-list" id="events-list">
+                        <div class="event-item event-info">System initialized</div>
+                    </div>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Quick Start -->
-    <section class="section section-dark" id="quickstart">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Get Started</span>
-                <h2 class="section-title">Quick Start</h2>
-            </div>
+        <div class="trial-note reveal">
+            <span>💡</span>
+            <span>This is a <strong>browser simulation</strong> of the real authentication flow. The actual system uses your <strong>live webcam and microphone</strong> for biometric capture.</span>
+        </div>
+    </div>
+</section>
 
-            <div class="quickstart-steps">
-                <div class="qs-step">
-                    <div class="qs-number">01</div>
-                    <div class="qs-content">
-                        <h4>Clone & Install</h4>
-                        <div class="code-inline">
-                            <code>git clone https://github.com/Shivani66-svg/AI-authentication-system.git</code><br>
-                            <code>cd AI-authentication-system</code><br>
-                            <code>pip install -r requirements.txt</code>
-                        </div>
-                    </div>
-                </div>
-                <div class="qs-step">
-                    <div class="qs-number">02</div>
-                    <div class="qs-content">
-                        <h4>Launch the App</h4>
-                        <div class="code-inline">
-                            <code>python gui_app.py</code>
-                        </div>
-                    </div>
-                </div>
-                <div class="qs-step">
-                    <div class="qs-number">03</div>
-                    <div class="qs-content">
-                        <h4>Enroll Yourself</h4>
-                        <p>Enter a username → scan iris → record voice × 2 → show gesture</p>
-                    </div>
-                </div>
-                <div class="qs-step">
-                    <div class="qs-number">04</div>
-                    <div class="qs-content">
-                        <h4>Authenticate</h4>
-                        <p>All 3 tiers must pass and match the same user for access</p>
-                    </div>
-                </div>
-            </div>
+<!-- ═══════════════════════ HOW IT WORKS ═══════════════════════ -->
+<section class="section section-dark" id="how-it-works">
+    <div class="container">
+        <div class="section-header reveal">
+            <div class="tag">System Flow</div>
+            <h2 class="section-title">How Authentication Works</h2>
+        </div>
 
-            <div class="qs-requirements">
-                <h4>Requirements</h4>
-                <div class="req-tags">
-                    <span class="req-tag">Python 3.8+</span>
-                    <span class="req-tag">Webcam</span>
-                    <span class="req-tag">Microphone</span>
-                    <span class="req-tag">Windows / macOS / Linux</span>
+        <div class="hiw-tabs reveal">
+            <button class="hiw-tab active" onclick="switchTab('enroll', this)">📝 Enrollment</button>
+            <button class="hiw-tab" onclick="switchTab('auth', this)">🔓 Authentication</button>
+        </div>
+
+        <div class="hiw-content" id="tab-enroll">
+            <div class="hiw-steps">
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">1</div>
+                    <div class="hiw-info">
+                        <h4>Enter Username</h4>
+                        <p>Alphanumeric + underscore only. Dangerous names and path traversal attempts are auto-blocked.</p>
+                    </div>
+                </div>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">2</div>
+                    <div class="hiw-info">
+                        <h4>Iris Capture with Liveness</h4>
+                        <p>50 frames captured. You must blink naturally — photos and videos are rejected by the EAR variance check.</p>
+                    </div>
+                </div>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">3</div>
+                    <div class="hiw-info">
+                        <h4>Voice Recording ×2</h4>
+                        <p>Your passphrase is recorded twice with a countdown. Both samples are averaged for a stable MFCC template.</p>
+                    </div>
+                </div>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">4</div>
+                    <div class="hiw-info">
+                        <h4>Gesture Capture</h4>
+                        <p>30 frames of your unique hand gesture. 83 features extracted — landmark coords, angles, and fingertip distances.</p>
+                    </div>
+                </div>
+                <div class="hiw-step hiw-step-success reveal">
+                    <div class="hiw-num">✓</div>
+                    <div class="hiw-info">
+                        <h4>Encrypt & Store</h4>
+                        <p>All features AES-128 encrypted with a machine-bound key. No raw images or audio saved — ever.</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <span class="logo-icon">🔒</span>
-                    <span class="logo-text">SECURITIX</span>
+        <div class="hiw-content hidden" id="tab-auth">
+            <div class="hiw-steps">
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">1</div>
+                    <div class="hiw-info">
+                        <h4>No Username Needed</h4>
+                        <p>The system automatically identifies you by scanning against ALL enrolled users in the database.</p>
+                    </div>
                 </div>
-                <p class="footer-desc">Three-Tier AI Biometric Authentication System</p>
-                <div class="footer-links">
-                    <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank">GitHub Repository</a>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">2</div>
+                    <div class="hiw-info">
+                        <h4>Iris + Liveness Check</h4>
+                        <p>Blink detection first, then iris geometry compared against all stored templates with threshold + margin checks.</p>
+                    </div>
                 </div>
-            </div>
-            <div class="footer-bottom">
-                <p>Built with Python, OpenCV, MediaPipe, and passion for security.</p>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">3</div>
+                    <div class="hiw-info">
+                        <h4>Voice DTW Matching</h4>
+                        <p>Live passphrase compared using Dynamic Time Warping. Must be within DTW distance ≤ 45.0 from your template.</p>
+                    </div>
+                </div>
+                <div class="hiw-step reveal">
+                    <div class="hiw-num">4</div>
+                    <div class="hiw-info">
+                        <h4>Gesture Verification</h4>
+                        <p>Your hand gesture compared with cosine similarity. Must reach 90% match with discrimination margin enforced.</p>
+                    </div>
+                </div>
+                <div class="hiw-step hiw-step-success reveal">
+                    <div class="hiw-num">✓</div>
+                    <div class="hiw-info">
+                        <h4>Identity Fusion</h4>
+                        <p>All 3 tiers must pass AND all must identify the SAME user. Any mismatch = access denied + audit log entry.</p>
+                    </div>
+                </div>
             </div>
         </div>
-    </footer>
+    </div>
+</section>
 
-    <script src="script.js"></script>
+<!-- ═══════════════════════ SECURITY WALL ═══════════════════════ -->
+<section class="section" id="security">
+    <div class="container">
+        <div class="section-header reveal">
+            <div class="tag tag-red">Defense in Depth</div>
+            <h2 class="section-title">12 Active Security Layers</h2>
+            <p class="section-sub">Every layer is independently active — compromising one doesn't break the others.</p>
+        </div>
+
+        <div class="security-wall">
+            <div class="sw-item reveal"><div class="sw-icon">🔐</div><div class="sw-info"><strong>AES-128-CBC Encryption</strong><span>Biometric data encrypted at rest</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">👁️</div><div class="sw-info"><strong>Blink Liveness Detection</strong><span>EAR variance anti-spoofing</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🚫</div><div class="sw-info"><strong>Brute-Force Lockout</strong><span>5 fails → 60-second cooldown</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🎯</div><div class="sw-info"><strong>Discrimination Margin</strong><span>Prevents ambiguous matches</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🛡️</div><div class="sw-info"><strong>Username Validation</strong><span>Path traversal prevention</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">📋</div><div class="sw-info"><strong>Audit Logging</strong><span>Every event timestamped</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">⏱️</div><div class="sw-info"><strong>API Rate Limiting</strong><span>Request throttling per IP</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🔑</div><div class="sw-info"><strong>Machine-Bound Keys</strong><span>Data non-transferable</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">📦</div><div class="sw-info"><strong>No allow_pickle</strong><span>Prevents numpy code injection</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🌐</div><div class="sw-info"><strong>Flask Security Headers</strong><span>CSP, X-Frame-Options</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">🤫</div><div class="sw-info"><strong>Generic Error Messages</strong><span>Zero information leakage</span></div></div>
+            <div class="sw-item reveal"><div class="sw-icon">💾</div><div class="sw-info"><strong>No Raw Data Stored</strong><span>Only math features saved</span></div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ TECH STACK ═══════════════════════ -->
+<section class="section section-dark" id="tech-stack">
+    <div class="container">
+        <div class="section-header reveal">
+            <div class="tag">Built With</div>
+            <h2 class="section-title">Technology Stack</h2>
+        </div>
+
+        <div class="tech-grid">
+            <div class="tech-card reveal" style="--tc:#6c5ce7"><div class="tc-name">Python 3.10</div><div class="tc-role">Core Language</div></div>
+            <div class="tech-card reveal" style="--tc:#00d2ff"><div class="tc-name">OpenCV</div><div class="tc-role">Camera & Imaging</div></div>
+            <div class="tech-card reveal" style="--tc:#00e676"><div class="tc-name">MediaPipe</div><div class="tc-role">Face & Hand Tracking</div></div>
+            <div class="tech-card reveal" style="--tc:#fdcb6e"><div class="tc-name">librosa</div><div class="tc-role">MFCC Extraction</div></div>
+            <div class="tech-card reveal" style="--tc:#fd79a8"><div class="tc-name">NumPy / SciPy</div><div class="tc-role">Scientific Computing</div></div>
+            <div class="tech-card reveal" style="--tc:#e17055"><div class="tc-name">Flask</div><div class="tc-role">Web Framework</div></div>
+            <div class="tech-card reveal" style="--tc:#a29bfe"><div class="tc-name">Tkinter</div><div class="tc-role">Desktop GUI</div></div>
+            <div class="tech-card reveal" style="--tc:#55efc4"><div class="tc-name">Fernet / AES</div><div class="tc-role">Encryption</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ CTA ═══════════════════════ -->
+<section class="section section-cta">
+    <div class="cta-bg"></div>
+    <div class="container">
+        <div class="cta-content reveal">
+            <h2>Ready to Try the Real Thing?</h2>
+            <p>Clone the repo, install dependencies, and experience real three-tier biometric authentication on your own machine.</p>
+            <div class="cta-code-block">
+                <code id="cta-code">git clone https://github.com/Shivani66-svg/AI-authentication-system.git && cd AI-authentication-system && pip install -r requirements.txt && python gui_app.py</code>
+                <button class="copy-btn" onclick="copyCode()" title="Copy to clipboard">
+                    <span id="copy-icon">⎘</span>
+                </button>
+            </div>
+            <a href="https://github.com/Shivani66-svg/AI-authentication-system" target="_blank" class="btn-hero-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                View on GitHub
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <div class="logo-shield small">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <span class="logo-text">SECURITIX</span>
+            </div>
+            <p class="footer-sub">Three-Tier AI Biometric Authentication System · Built with Python, OpenCV & MediaPipe</p>
+            <a href="https://github.com/Shivani66-svg/AI-authentication-system" class="footer-link" target="_blank">github.com/Shivani66-svg/AI-authentication-system</a>
+        </div>
+    </div>
+</footer>
+
+<script src="script.js"></script>
 </body>
 </html>
