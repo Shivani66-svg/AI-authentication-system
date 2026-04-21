@@ -82,6 +82,64 @@ CAM_W = 640
 CAM_H = 360
 
 
+def open_camera():
+    """Open camera with robust fallback for different laptops/backends.
+    Tries multiple backends and resolutions to maximize compatibility.
+    Returns an opened cv2.VideoCapture or None.
+    """
+    # Try backends in order: default, DirectShow (Windows), MSMF (Windows)
+    backends = [
+        (cv2.CAP_ANY, "default"),
+        (cv2.CAP_DSHOW, "DirectShow"),
+    ]
+    # Add MSMF if available
+    if hasattr(cv2, 'CAP_MSMF'):
+        backends.append((cv2.CAP_MSMF, "MSMF"))
+
+    resolutions = [
+        (1280, 720),
+        (640, 480),
+        (320, 240),
+    ]
+
+    for backend, bname in backends:
+        try:
+            cap = cv2.VideoCapture(0, backend)
+        except Exception:
+            cap = cv2.VideoCapture(0)
+
+        if not cap.isOpened():
+            cap.release()
+            continue
+
+        # Try resolutions from high to low
+        for w, h in resolutions:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+
+            # Warm up: try to read a few frames
+            ok = False
+            for _ in range(15):
+                ret, frame = cap.read()
+                if ret and frame is not None and frame.size > 0:
+                    ok = True
+                    break
+                time.sleep(0.05)
+
+            if ok:
+                print(f"  [CAMERA] Opened with {bname} backend at {w}x{h}")
+                # Read a few more warm-up frames for auto-exposure
+                for _ in range(5):
+                    cap.read()
+                return cap
+
+        cap.release()
+
+    print("  [CAMERA ERROR] Could not open camera with any backend!")
+    return None
+
+
+
 def make_tier_row(parent, icon, name):
     """Create a consistently aligned tier status row using grid layout."""
     row = tk.Frame(parent, bg=C["input"], highlightbackground=C["border"],
@@ -442,13 +500,13 @@ class SecurityApp(tk.Tk):
     def _run_enroll(self, name):
         cam = None
         try:
-            # Pre-open camera once for instant startup across all tiers
-            cam = cv2.VideoCapture(0)
-            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            # Warm up: read frames to let auto-exposure settle
-            for _ in range(10):
-                cam.read()
+            # Pre-open camera with robust fallback for different laptops
+            cam = open_camera()
+            if cam is None or not cam.isOpened():
+                self.after(0, lambda: self._enroll_done(False,
+                    "Cannot open camera! Check if another app is using it,\n"
+                    "or try closing and reopening the application."))
+                return
 
             # Tier 1: Iris
             self.after(0, lambda: self._set_tier(self.et, "t1", "running", "Look at the camera..."))
@@ -734,12 +792,13 @@ class SecurityApp(tk.Tk):
         try:
             users = get_all_users()
 
-            # Pre-open camera once for instant startup across all tiers
-            cam = cv2.VideoCapture(0)
-            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            for _ in range(10):
-                cam.read()
+            # Pre-open camera with robust fallback for different laptops
+            cam = open_camera()
+            if cam is None or not cam.isOpened():
+                self.after(0, lambda: self._auth_done(False,
+                    "Cannot open camera! Check if another app is using it,\n"
+                    "or try closing and reopening the application."))
+                return
 
             # Tier 1: Iris
             self.after(0, lambda: self._set_tier(self.at, "t1", "running", "Scanning iris..."))

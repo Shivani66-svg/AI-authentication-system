@@ -226,12 +226,19 @@ def enroll_gesture(frame_callback=None, cap=None):
 
     own_cap = cap is None
     if own_cap:
-        cap = cv2.VideoCapture(0)
+        # Try DirectShow backend first (more compatible on Windows)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap.release()
+            cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             print("  [GESTURE ERROR] Cannot open webcam!")
             return None
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Warm up
+        for _ in range(10):
+            cap.read()
 
     hands = mp_hands.Hands(
         max_num_hands=1,
@@ -245,11 +252,18 @@ def enroll_gesture(frame_callback=None, cap=None):
     timeout = 30
     stable_gesture = None
     stability_count = 0
+    consecutive_failures = 0  # Track consecutive frame read failures
 
     while len(collected_features) < target_samples:
         ret, frame = cap.read()
-        if not ret:
-            break
+        if not ret or frame is None:
+            consecutive_failures += 1
+            if consecutive_failures > 30:
+                print("  [GESTURE] Too many consecutive frame failures.")
+                break
+            time.sleep(0.05)
+            continue
+        consecutive_failures = 0
 
         if time.time() - start_time > timeout:
             print("  [GESTURE] Timeout reached.")
@@ -344,12 +358,19 @@ def capture_gesture(frame_callback=None, cap=None):
 
     own_cap = cap is None
     if own_cap:
-        cap = cv2.VideoCapture(0)
+        # Try DirectShow backend first (more compatible on Windows)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap.release()
+            cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             print("  [GESTURE ERROR] Cannot open webcam!")
             return None
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Warm up
+        for _ in range(10):
+            cap.read()
 
     hands = mp_hands.Hands(
         max_num_hands=1,
@@ -361,11 +382,18 @@ def capture_gesture(frame_callback=None, cap=None):
     target_samples = 20
     start_time = time.time()
     timeout = 20
+    consecutive_failures = 0  # Track consecutive frame read failures
 
     while len(collected_features) < target_samples:
         ret, frame = cap.read()
-        if not ret:
-            break
+        if not ret or frame is None:
+            consecutive_failures += 1
+            if consecutive_failures > 30:
+                print("  [GESTURE] Too many consecutive frame failures.")
+                break
+            time.sleep(0.05)
+            continue
+        consecutive_failures = 0
 
         if time.time() - start_time > timeout:
             print("  [GESTURE] Timeout reached.")
